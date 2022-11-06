@@ -22,7 +22,7 @@
     MACD_SLOW = 26
     MACD_SIGNAL = 9
 
-    BACK_DAYS = 7 # จำนวนวะนย้อนหลัง
+    BACK_DAYS = 7 # จำนวนวันย้อนหลัง ที่จะคำนวนสัญญาน
 
     CANDLE_TIMEFRAME = '15m'  # รูปแบบ timeframe 15m, 4h, 1d
     CANDLE_MAX_RECORD = 100
