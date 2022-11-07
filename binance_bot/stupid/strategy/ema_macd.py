@@ -2,103 +2,26 @@ from dataclasses import dataclass
 from application.core.TraderAction import LongEntry_MarketOrder, ShortEntry_MarketOrder, Close_All_Position
 from stupid.MaoChart import Make_Graph
 from stupid.LineNotify import Send_Image
-import os
+import os, configparser
 
-# Watch_List = ['BTCUSDT','ETHUSDT','BCHUSDT','XRPUSDT','EOSUSDT','LTCUSDT','TRXUSDT','ETCUSDT','LINKUSDT','XLMUSDT','ADAUSDT','XMRUSDT','DASHUSDT','ZECUSDT','XTZUSDT','BNBUSDT','ATOMUSDT','ONTUSDT','IOTAUSDT','BATUSDT','VETUSDT','NEOUSDT','QTUMUSDT','IOSTUSDT','THETAUSDT','ALGOUSDT','ZILUSDT','KNCUSDT','ZRXUSDT','COMPUSDT','OMGUSDT','DOGEUSDT','SXPUSDT','KAVAUSDT','BANDUSDT','RLCUSDT','WAVESUSDT','MKRUSDT','SNXUSDT','DOTUSDT','DEFIUSDT','YFIUSDT','BALUSDT','CRVUSDT','TRBUSDT','YFIIUSDT','RUNEUSDT','SUSHIUSDT','SRMUSDT','BZRXUSDT','EGLDUSDT','SOLUSDT','ICXUSDT','STORJUSDT','BLZUSDT','UNIUSDT','AVAXUSDT','FTMUSDT','HNTUSDT','ENJUSDT','FLMUSDT','TOMOUSDT','RENUSDT','KSMUSDT','NEARUSDT','AAVEUSDT','FILUSDT','RSRUSDT','LRCUSDT','MATICUSDT','OCEANUSDT','CVCUSDT','BELUSDT','CTKUSDT','AXSUSDT','ALPHAUSDT','ZENUSDT','SKLUSDT','GRTUSDT','1INCHUSDT','BTCBUSD','AKROUSDT','CHZUSDT','SANDUSDT','ANKRUSDT','LUNAUSDT','BTSUSDT','LITUSDT','UNFIUSDT','DODOUSDT','REEFUSDT','RVNUSDT','SFPUSDT','XEMUSDT','BTCSTUSDT','COTIUSDT','CHRUSDT','MANAUSDT','ALICEUSDT','HBARUSDT','ONEUSDT','LINAUSDT','STMXUSDT','DENTUSDT','CELRUSDT','HOTUSDT','MTLUSDT','OGNUSDT','BTTUSDT','NKNUSDT','SCUSDT','DGBUSDT','1000SHIBUSDT','ICPUSDT','BAKEUSDT','GTCUSDT','ETHBUSD','BTCDOMUSDT','KEEPUSDT','TLMUSDT','BNBBUSD','ADABUSD','XRPBUSD','IOTXUSDT','DOGEBUSD','AUDIOUSDT','RAYUSDT','C98USDT','MASKUSDT','ATAUSDT','SOLBUSD','FTTBUSD','DYDXUSDT','1000XECUSDT','GALAUSDT','CELOUSDT','ARUSDT','KLAYUSDT','ARPAUSDT','NUUSDT','CTSIUSDT','LPTUSDT']
-# Watch_List = ['GALAUSDT','TOMOUSDT','LRCUSDT','ALGOUSDT','1000SHIBUSDT','ONEUSDT','CRVUSDT','OGNUSDT','RSRUSDT','ENJUSDT','MANAUSDT','CELRUSDT','CTKUSDT','DODOUSDT','ALPHAUSDT','CTSIUSDT','ATAUSDT','IOSTUSDT','AUDIOUSDT','CHZUSDT','HOTUSDT','ARPAUSDT','SFPUSDT','DGBUSDT','FLMUSDT','REEFUSDT','BZRXUSDT','AKROUSDT','LITUSDT','BAKEUSDT','SKLUSDT','BLZUSDT','FTMUSDT','BELUSDT','COTIUSDT','HBARUSDT','GRTUSDT','RENUSDT','KAVAUSDT','SRMUSDT','CELOUSDT','DENTUSDT','BATUSDT','OCEANUSDT','SXPUSDT','ZILUSDT','VETUSDT','XTZUSDT','LINAUSDT','KEEPUSDT','TRXUSDT','ONTUSDT','NKNUSDT','KNCUSDT','XEMUSDT','BTTUSDT','MTLUSDT','ZRXUSDT','IOTAUSDT','MATICUSDT','SANDUSDT','1000XECUSDT','DOGEUSDT','BTSUSDT','C98USDT','TLMUSDT','XLMUSDT','EOSUSDT','STMXUSDT','CVCUSDT','XRPUSDT','1INCHUSDT','RVNUSDT','ICXUSDT','ADAUSDT','NUUSDT','SCUSDT','RLCUSDT','KLAYUSDT','IOTXUSDT','ANKRUSDT','STORJUSDT','CHRUSDT']
-# Watch_List = ['BTCUSDT','ETHUSDT','XRPUSDT','DOGEUSDT','LUNAUSDT','ICPUSDT','C98USDT','JASMYUSDT']
+config = configparser.ConfigParser()
+config.optionxform = str
+config_file = open("config.ini", encoding="utf8")
+config.readfp(config_file)
 
-# only bitkub lists
-Watch_List = [
-    "1INCHUSDT",
-    "AAVEUSDT",
-    #"ABTUSDT",
-    "ADAUSDT",
-    "ALGOUSDT",
-    "ALPHAUSDT",
-    "APEUSDT",
-    "ATOMUSDT",
-    "AVAXUSDT",
-    "AXSUSDT",
-    "BALUSDT",
-    "BANDUSDT",
-    "BATUSDT",
-    "BCHUSDT",
-    "BNBUSDT",
-    "BTCUSDT",
-    #"BUSDUSDT",
-    "CELOUSDT",
-    "CHZUSDT",
-    "COMPUSDT",
-    "CRVUSDT",
-    # "CTXCUSDT",
-    "CVCUSDT",
-    #"DAIUSDT",
-    "DOGEUSDT",
-    "DOTUSDT",
-    "DYDXUSDT",
-    "ENJUSDT",
-    "ENSUSDT",
-    "ETHUSDT",
-    "FTMUSDT",
-    "FTTUSDT",
-    "GALUSDT",
-    "GALAUSDT",
-    #"GFUSDT",
-    #"GLMUSDT",
-    "GRTUSDT",
-    #"GTUSDT",
-    "HBARUSDT",
-    # "ILVUSDT",
-    "IMXUSDT",
-    "IOSTUSDT",
-    #"JFINUSDT",
-    "KNCUSDT",
-    "KSMUSDT",
-    #"KUBUSDT",
-    "LINKUSDT",
-    "LRCUSDT",
-    #"LUNAUSDT",
-    #"LYXEUSDT",
-    "MANAUSDT",
-    "MATICUSDT",
-    "MKRUSDT",
-    "NEARUSDT",
-    "OCEANUSDT",
-    "OMGUSDT",
-    "OPUSDT",
-    #"POWRUSDT",
-    "SANDUSDT",
-    # "SCRTUSDT",
-    #"SIXUSDT",
-    #"SNTUSDT",
-    "SNXUSDT",
-    "SOLUSDT",
-    "SUSHIUSDT",
-    "TRXUSDT",
-    "UNIUSDT",
-    #"USDCUSDT",
-    #"USDTUSDT",
-    # "WANUSDT",
-    "XLMUSDT",
-    "XRPUSDT",
-    "XTZUSDT",
-    "YFIUSDT",
-    "ZILUSDT",
-    "ZRXUSDT",
-]
+WATCH_LIST = [x.strip() for x in config['ema_macd']['watch_list'].split(',')]
 
-EMA_BASE = 35
-EMA_FAST = 8
-EMA_SLOW = 32
-MACD_FAST = 12
-MACD_SLOW = 26
-MACD_SIGNAL = 9
+EMA_BASE = int(config['ema_macd']['ema_base'])
+EMA_FAST = int(config['ema_macd']['ema_fast'])
+EMA_SLOW = int(config['ema_macd']['ema_slow'])
+MACD_FAST = int(config['ema_macd']['macd_fast'])
+MACD_SLOW = int(config['ema_macd']['macd_slow'])
+MACD_SIGNAL = int(config['ema_macd']['macd_signal'])
 
-BACK_DAYS = 7
+BACK_DAYS = int(config['ema_macd']['back_days'])
 
-CANDLE_TIMEFRAME = '5m'
-CANDLE_MAX_RECORD = 100
+CANDLE_TIMEFRAME = config['ema_macd']['candle_timeframe']
+CANDLE_MAX_RECORD = int(config['ema_macd']['candle_max_record'])
 
 # ควรจะกำหนดช่วงเวลาให้ได้ข้อมูลมากกว่าจำนวน CANDLE_MAX_RECORD + max(EMA_BASE, EMA_SLOW, MACD_SLOW) => 100 + 35 = 135
 HISTORICAL_CANDLE = {
@@ -127,7 +50,7 @@ class ParametersOnData:
 
 class TradingStrategy:
     def __init__(self):
-        self.watch_list = Watch_List
+        self.watch_list = WATCH_LIST
         self.parameters_on_data = ParametersOnData()
         self.parameters_on_risk = ParametersOnRisk()
     
@@ -164,7 +87,7 @@ class TradingStrategy:
                         print('up', symbol)
                         Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'up')
                         Send_Image(f'\nตรวจพบสัญญาน UP ที่เหรียญ {symbol}', filename)
-                        os.remove(filename)
+                        # os.remove(filename)
                         break
                     # down
                     # คิดตรงข้ามกับ up
@@ -175,7 +98,7 @@ class TradingStrategy:
                         print('down', symbol)
                         Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'down')
                         Send_Image(f'\nตรวจพบสัญญาน DOWN ที่เหรียญ {symbol}', filename)
-                        os.remove(filename)
+                        # os.remove(filename)
                         break
 
             except Exception as ex:

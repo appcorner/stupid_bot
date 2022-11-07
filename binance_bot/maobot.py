@@ -5,6 +5,7 @@ import asyncio, config
 from application.core.Exchange import Binance
 from stupid.strategy.ema_macd import TradingStrategy
 import time, os, sys
+import pathlib
 
 async def main():
     app = App(
@@ -31,6 +32,7 @@ async def shutdown(time_limit_seconds):
     raise TimeoutError
     
 if __name__ == "__main__":
+    pathlib.Path('./plots').mkdir(parents=True, exist_ok=True) 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
     time.sleep(15)

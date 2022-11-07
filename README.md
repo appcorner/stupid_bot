@@ -1,30 +1,44 @@
 # stupid_bot
 
+    cd binance_bot
+
 ## pip
 
     pip install python-binance
     pip install mplfinance
 
-## setting config.py
+## config.ini
 
-    API_KEY = '<binance api key>'
-    API_SECRET = '<binance app secret>'
-    LINE_NOTIFY_TOKEN = '<line notify token>'
+    [binance]
+    api_key = <binance api key>
+    api_secret = <binance app secret>
 
-## config maobot -> stupid\strategy\ema_macd.py
+    [line]
+    notify_token = <line notify token>
+
+    [ema_macd]
+    # only bitkub lists
+    watch_list = 1INCHUSDT,AAVEUSDT,ADAUSDT,ALGOUSDT,ALPHAUSDT,APEUSDT,ATOMUSDT,AVAXUSDT,AXSUSDT,BALUSDT,BANDUSDT,BATUSDT,BCHUSDT,BNBUSDT,BTCUSDT,CELOUSDT,CHZUSDT,COMPUSDT,CRVUSDT,CVCUSDT,DOGEUSDT,DOTUSDT,DYDXUSDT,ENJUSDT,ENSUSDT,ETHUSDT,FTMUSDT,FTTUSDT,GALUSDT,GALAUSDT,GRTUSDT,HBARUSDT,IMXUSDT,IOSTUSDT,KNCUSDT,KSMUSDT,LINKUSDT,LRCUSDT,MANAUSDT,MATICUSDT,MKRUSDT,NEARUSDT,OCEANUSDT,OMGUSDT,OPUSDT,SANDUSDT,SNXUSDT,SOLUSDT,SUSHIUSDT,TRXUSDT,UNIUSDT,XLMUSDT,XRPUSDT,XTZUSDT,YFIUSDT,ZILUSDT,ZRXUSDT
 
     # ค่าที่ใช้ในการคำนวนสัญญาน
-    EMA_BASE = 35
-    EMA_FAST = 8
-    EMA_SLOW = 32
-    MACD_FAST = 12
-    MACD_SLOW = 26
-    MACD_SIGNAL = 9
+    ema_base = 35
+    ema_fast = 8
+    ema_slow = 32
+    macd_fast = 12
+    macd_slow = 26
+    macd_signal = 9
 
-    BACK_DAYS = 7 # จำนวนวันย้อนหลัง สำหรับใช้ตรวจสัญญาน
+    # จำนวนวันย้อนหลัง สำหรับใช้ตรวจสัญญาน
+    back_days = 3 
 
-    CANDLE_TIMEFRAME = '15m' # รูปแบบ timeframe 15m, 4h, 1d
-    CANDLE_MAX_RECORD = 100 # จำนวน timeframe ที่กำหนดใน plot
+    # รูปแบบ timeframe 1m, 5m, 15m, 1h, 4h, 1d
+    candle_timeframe = 15m
+    # จำนวน timeframe ที่แสดงใน plot
+    candle_max_record = 100
+
+## create folder (if not exist) -> plots
+
+    mkdir plots
 
 ## run bot
 
