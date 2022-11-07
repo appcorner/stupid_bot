@@ -87,7 +87,7 @@ class TradingStrategy:
                         print('up', symbol)
                         Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'up')
                         Send_Image(f'\nตรวจพบสัญญาน UP ที่เหรียญ {symbol}', filename)
-                        # os.remove(filename)
+                        os.remove(filename)
                         break
                     # down
                     # คิดตรงข้ามกับ up
@@ -98,7 +98,7 @@ class TradingStrategy:
                         print('down', symbol)
                         Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'down')
                         Send_Image(f'\nตรวจพบสัญญาน DOWN ที่เหรียญ {symbol}', filename)
-                        # os.remove(filename)
+                        os.remove(filename)
                         break
 
             except Exception as ex:
