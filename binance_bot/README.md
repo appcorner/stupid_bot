@@ -1,3 +1,7 @@
+please goto https://github.com/PetchGit/binance_bot for original.
+
+---
+
 Hi, My name is Petch. Warm welcome to you.
 
 This module is named OMBB abbreviated from 'One-Page Multimonitor Binance Bot'. I created this module with these two philosophies in mind.
