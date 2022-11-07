@@ -2,3 +2,4 @@ calculation_library/
 order_history/
 record_live_trade/
 App.log
+config.ini
