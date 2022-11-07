@@ -141,11 +141,11 @@ class TradingStrategy:
 
                 for i in range(BACK_DAYS):
                     last = df.iloc[signal_idx-i]
-                    last2rd = df.iloc[signal_idx-1-i]
+                    last2nd = df.iloc[signal_idx-1-i]
                     last3rd = df.iloc[signal_idx-2-i]
                     # long
                     if last['close'] > last['EWMbase'] and \
-                        last['close'] > last2rd['high'] and \
+                        last['close'] > last2nd['high'] and \
                         last['MACD'] > 0 and \
                         last3rd['MACD'] < 0:
                         print('long', symbol)
@@ -155,7 +155,7 @@ class TradingStrategy:
                         break
                     # short
                     elif last['close'] < last['EWMbase'] and \
-                        last['close'] < last2rd['low'] and \
+                        last['close'] < last2nd['low'] and \
                         last['MACD'] < 0 and \
                         last3rd['MACD'] > 0:
                         print('short', symbol)
