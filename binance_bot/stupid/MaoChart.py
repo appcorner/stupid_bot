@@ -7,7 +7,7 @@ import numpy as np
 from datetime import datetime
 import os
 
-def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx = -1, trend='long'):
+def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx = -1, trend='up'):
     iday = df.tail(tf_count)
     iday['time'] = iday['time'].map(pd.to_datetime)
     iday.set_index('time', inplace=True)
@@ -35,7 +35,7 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
     fibo_xvalues = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1,1.382,1.618]
     minmax_points = []
 
-    if trend.lower() == 'long':
+    if trend.lower() == 'up':
         isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S') > datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S')
         # print(isFiboRetrace)
 
@@ -60,7 +60,7 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
             for fibo_val in fibo_values:
                 fibo_level = new_minimum_price + difference * fibo_val
                 fibo_levels.append(fibo_level)
-    else:
+    elif trend.lower() == 'down':
         isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S') < datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S')
         # print(isFiboRetrace)
 

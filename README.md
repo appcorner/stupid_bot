@@ -5,7 +5,6 @@
     pip install python-binance
     pip install mplfinance
 
-
 ## setting config.py
 
     API_KEY = '<binance api key>'
@@ -26,13 +25,6 @@
 
     CANDLE_TIMEFRAME = '15m' # รูปแบบ timeframe 15m, 4h, 1d
     CANDLE_MAX_RECORD = 100 # จำนวน timeframe ที่กำหนดใน plot
-
-    ...
-    historical_candle_lookback : str = '45 hr ago UTC' # กำหนดเวลาที่ครอบคุมจำนวน timeframe ที่กำหนด
-    # 1m -> '2 hr for ago UTC'
-    # 15m -> '45 hr for ago UTC'
-    # 4h -> '30 day for ago UTC'
-    # 1d -> '150 day for ago UTC'
 
 ## run bot
 

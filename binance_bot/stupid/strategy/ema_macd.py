@@ -97,8 +97,18 @@ MACD_SIGNAL = 9
 
 BACK_DAYS = 7
 
-CANDLE_TIMEFRAME = '15m'
+CANDLE_TIMEFRAME = '5m'
 CANDLE_MAX_RECORD = 100
+
+# ควรจะกำหนดช่วงเวลาให้ได้ข้อมูลมากกว่าจำนวน CANDLE_MAX_RECORD + max(EMA_BASE, EMA_SLOW, MACD_SLOW) => 100 + 35 = 135
+HISTORICAL_CANDLE = {
+    '1m': '3 hours ago UTC', # 60 * 3 = 180
+    '5m': '12 hours ago UTC', # 12 * 12 = 144
+    '15m': '40 hours ago UTC', # 4 * 40 = 160
+    '1h': '7 days ago UTC', # 24 * 7 = 168
+    '4h': '25 days ago UTC', # 6 * 25 = 150
+    '1d': '135 days ago UTC', # 1 * 135 = 135
+}
 
 @dataclass
 class ParametersOnRisk:
@@ -110,7 +120,7 @@ class ParametersOnRisk:
 class ParametersOnData:
     candle_max_length : int = CANDLE_MAX_RECORD + max(EMA_BASE, EMA_SLOW, MACD_SLOW)
     candle_timeframe : str = CANDLE_TIMEFRAME
-    historical_candle_lookback : str = '45 hr ago UTC'
+    historical_candle_lookback : str = HISTORICAL_CANDLE[CANDLE_TIMEFRAME]
     orderbook_depth: int = 5
     liquidation_data_length: int = 5
     liquidation_data_criteria: float = 0.0
@@ -143,24 +153,28 @@ class TradingStrategy:
                     last = df.iloc[signal_idx-i]
                     last2nd = df.iloc[signal_idx-1-i]
                     last3rd = df.iloc[signal_idx-2-i]
-                    # long
+                    # up
+                    # 1. แท่งเทียน​ อยู่เหนือ​ เส้น​ EMA 35 หรือ​ 32​ ก็ได้
+                    # 2. MACD > 0
+                    # 3. แท่งราคาปิด​ break ​แท่งเทียน​ ราคา ​High ก่อนหน้า
                     if last['close'] > last['EWMbase'] and \
-                        last['close'] > last2nd['high'] and \
                         last['MACD'] > 0 and \
+                        last['close'] > last2nd['high'] and \
                         last3rd['MACD'] < 0:
-                        print('long', symbol)
-                        Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'long')
-                        Send_Image(f'\nตรวจพบสัญญาน LONG ที่เหรียญ {symbol}', filename)
+                        print('up', symbol)
+                        Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'up')
+                        Send_Image(f'\nตรวจพบสัญญาน UP ที่เหรียญ {symbol}', filename)
                         os.remove(filename)
                         break
-                    # short
+                    # down
+                    # คิดตรงข้ามกับ up
                     elif last['close'] < last['EWMbase'] and \
-                        last['close'] < last2nd['low'] and \
                         last['MACD'] < 0 and \
+                        last['close'] < last2nd['low'] and \
                         last3rd['MACD'] > 0:
-                        print('short', symbol)
-                        Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'short')
-                        Send_Image(f'\nตรวจพบสัญญาน SHORT ที่เหรียญ {symbol}', filename)
+                        print('down', symbol)
+                        Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx-i, 'down')
+                        Send_Image(f'\nตรวจพบสัญญาน DOWN ที่เหรียญ {symbol}', filename)
                         os.remove(filename)
                         break
 
@@ -180,15 +194,14 @@ class TradingStrategy:
         pass
     
     def add_indicators(self, df):
-        print('=> add_indicators')
+        # print('=> add_indicators')
 
         # cal MACD
-        exp_fast     = df['close'].ewm(span=MACD_FAST, adjust=False).mean()
-        exp_slow     = df['close'].ewm(span=MACD_SLOW, adjust=False).mean()
-        df['MACD']   = exp_fast - exp_slow
+        ewm_fast     = df['close'].ewm(span=MACD_FAST, adjust=False).mean()
+        ewm_slow     = df['close'].ewm(span=MACD_SLOW, adjust=False).mean()
+        df['MACD']   = ewm_fast - ewm_slow
         df['MACDs']  = df['MACD'].ewm(span=MACD_SIGNAL).mean()
         df['MACDh']  = df['MACD'] - df['MACDs']
-        # df.ta.macd(close='close', fast=8, slow=26, signal=2, append=True)
         # cal EMA
         df['EWMbase'] = df['close'].ewm(span=EMA_BASE).mean()
         df['EWMfast'] = df['close'].ewm(span=EMA_FAST).mean()
