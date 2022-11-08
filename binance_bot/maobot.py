@@ -17,7 +17,7 @@ async def main():
     try:
         await asyncio.gather(
             run_app(app),
-            shutdown(3600)
+            # shutdown(3600)
         )
     except TimeoutError:
         await app.quit()
