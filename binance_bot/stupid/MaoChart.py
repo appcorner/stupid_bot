@@ -31,8 +31,8 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
     # fifth_level = minimum_price + difference * 0.786
 
     fibo_colors = ['red','brown','orange','yellow','green','blue','gray','purple','purple','purple']
-    fibo_rvalues = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1]
-    fibo_xvalues = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1,1.382,1.618]
+    fibo_rvalues = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1,1.382]
+    fibo_xvalues = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1,1.382]
     minmax_points = []
 
     if trend.lower() == 'up':
@@ -50,8 +50,8 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
         else:
             maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
             # print(maxidx)
-            new_minimum_index = iday_minmax['low'].iloc[maxidx:].idxmin()
-            new_minimum_price = iday_minmax['low'].iloc[maxidx:].min()
+            new_minimum_index = iday_minmax['low'].iloc[maxidx+1:].idxmin()
+            new_minimum_price = iday_minmax['low'].iloc[maxidx+1:].min()
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((maximum_index,maximum_price))
             minmax_points.append((new_minimum_index,new_minimum_price))
@@ -64,7 +64,7 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
         isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S') < datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S')
         # print(isFiboRetrace)
 
-        fibo_colors = ['red','brown','orange','yellow','green','blue','gray','purple','purple','purple']
+        fibo_colors = ['red','brown','orange','gold','green','blue','gray','purple','purple','purple']
         if isFiboRetrace:
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((maximum_index,maximum_price))
@@ -76,8 +76,8 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
         else:
             minidx = np.where(iday_minmax.index==minimum_index)[0][0]
             # print(maxidx)
-            new_maximum_index = iday_minmax['high'].iloc[minidx:].idxmax()
-            new_maximum_price = iday_minmax['high'].iloc[minidx:].max()
+            new_maximum_index = iday_minmax['high'].iloc[minidx+1:].idxmax()
+            new_maximum_price = iday_minmax['high'].iloc[minidx+1:].max()
             minmax_points.append((maximum_index,maximum_price))
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((new_maximum_index,new_maximum_price))
@@ -88,12 +88,14 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
                 fibo_levels.append(fibo_level)
 
     colors = ['green' if value >= 0 else 'red' for value in iday['MACD']]
-    apds = [mpf.make_addplot(iday['EWMbase'],color='red'),
-            mpf.make_addplot(iday['EWMfast'],color='magenta'),
-            mpf.make_addplot(iday['EWMslow'],color='orange'),
-            mpf.make_addplot(iday['MACD'],type='bar',width=0.7,panel=2,color=colors),
-            mpf.make_addplot(iday['MACDs'],panel=2,color='b'),
-        ]
+    added_plots = [
+        mpf.make_addplot(iday['EWMbase'],color='red'),
+        mpf.make_addplot(iday['EWMfast'],color='magenta'),
+        mpf.make_addplot(iday['EWMslow'],color='orange'),
+        mpf.make_addplot(iday['RSI'],color='pink'),
+        mpf.make_addplot(iday['MACD'],type='bar',width=0.7,panel=2,color=colors),
+        mpf.make_addplot(iday['MACDs'],panel=2,color='b'),
+    ]
     fibo_lines = dict(
         hlines=fibo_levels,
         colors=fibo_colors,
@@ -103,7 +105,7 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
         )
     minmax_lines = dict(
         alines=minmax_points,
-        colors='blue',
+        colors='cyan',
         # linestyle='-.',
         linewidths=0.5,
         )
@@ -122,8 +124,8 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
         alines=minmax_lines,
         figscale=1.5,
         figratio=(8, 6),
-        panel_ratios=(8,3,3),
-        addplot=apds,
+        panel_ratios=(8,2,2),
+        addplot=added_plots,
         scale_padding={'left': 0.5, 'top': 0.8, 'right': 1.1, 'bottom': 0.5},
         )
 
@@ -144,7 +146,13 @@ def Make_Graph(df, filename, ticket_symbol, tf_label, tf_count=100, signal_idx =
         axlist[0].set_xlabel(f'(fibo extension, tf({tf_label})={tf_count})')
 
     for idx, fibo_val in enumerate(fibo_values):
-        axlist[0].text(0,fibo_levels[idx],f'{fibo_val}({fibo_levels[idx]:.4f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='right')
+        axlist[0].text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]:.4f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
+    
+    labels = ['EWMbase', 'EWMfast', 'EWMslow', 'RSI']
+    # axlist[0].legend()
+    # axlist[0].legend([None]*(len(labels)+2))
+    # handles = axlist[0].get_legend().legendHandles
+    # axlist[0].legend(handles=handles[2:], labels=labels, loc='lower left')
 
     # mpf.show()
     fig.savefig(filename)

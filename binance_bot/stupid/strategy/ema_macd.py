@@ -14,9 +14,12 @@ WATCH_LIST = [x.strip() for x in config['ema_macd']['watch_list'].split(',')]
 EMA_BASE = int(config['ema_macd']['ema_base'])
 EMA_FAST = int(config['ema_macd']['ema_fast'])
 EMA_SLOW = int(config['ema_macd']['ema_slow'])
+
 MACD_FAST = int(config['ema_macd']['macd_fast'])
 MACD_SLOW = int(config['ema_macd']['macd_slow'])
 MACD_SIGNAL = int(config['ema_macd']['macd_signal'])
+
+RSI_PERIOD = int(config['ema_macd']['rsi_period'])
 
 BACK_DAYS = int(config['ema_macd']['back_days'])
 
@@ -53,12 +56,17 @@ class TradingStrategy:
         self.watch_list = WATCH_LIST
         self.parameters_on_data = ParametersOnData()
         self.parameters_on_risk = ParametersOnRisk()
+        self.count = 0
+        self.status = ('|','/','-','\\')
     
     async def on_second(self, market_data, orderbook_data, portfolio_data, liquidation_data):
+        self.count += 1
+        print(self.status[self.count%4], end='\r')
         pass
     
     async def on_candle_closed(self, market_data, orderbook_data, portfolio_data, liquidation_data, order_history, trade_history):
         print('=> on_candle_closed')
+        self.count = 0
 
         # print(market_data['XRPUSDT'].loc[0,'time'], market_data['XRPUSDT'].loc[0,'close'])
         # print(market_data['1000SHIBUSDT'].loc[0,'time'], market_data['1000SHIBUSDT'].loc[0,'close'])
@@ -100,6 +108,7 @@ class TradingStrategy:
                         Send_Image(f'\nตรวจพบสัญญาน DOWN ที่เหรียญ {symbol}', filename)
                         os.remove(filename)
                         break
+                # Make_Graph(df, filename, symbol, CANDLE_TIMEFRAME, CANDLE_MAX_RECORD, signal_idx, 'down')
 
             except Exception as ex:
                 print('err', ex)
@@ -129,6 +138,14 @@ class TradingStrategy:
         df['EWMbase'] = df['close'].ewm(span=EMA_BASE).mean()
         df['EWMfast'] = df['close'].ewm(span=EMA_FAST).mean()
         df['EWMslow'] = df['close'].ewm(span=EMA_SLOW).mean()
+        # cal RSI
+        change = df['close'].diff(1)
+        gain = change.mask(change<0,0)
+        loss = change.mask(change>0,0)
+        avg_gain = gain.ewm(com = RSI_PERIOD-1,min_periods=RSI_PERIOD).mean()
+        avg_loss = loss.ewm(com = RSI_PERIOD-1,min_periods=RSI_PERIOD).mean()
+        rs = abs(avg_gain / avg_loss)
+        df["RSI"] = 100 - ( 100 / ( 1 + rs ))
 
         # print(len(df))
         
