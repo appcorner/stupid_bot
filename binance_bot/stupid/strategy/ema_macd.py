@@ -44,7 +44,7 @@ class ParametersOnRisk:
     
 @dataclass
 class ParametersOnData:
-    candle_max_length : int = CANDLE_MAX_RECORD + max(EMA_BASE, EMA_SLOW, MACD_SLOW)
+    candle_max_length : int = CANDLE_MAX_RECORD + max(EMA_BASE, EMA_SLOW, MACD_SLOW, RSI_PERIOD)
     candle_timeframe : str = CANDLE_TIMEFRAME
     historical_candle_lookback : str = HISTORICAL_CANDLE[CANDLE_TIMEFRAME]
     orderbook_depth: int = 5
