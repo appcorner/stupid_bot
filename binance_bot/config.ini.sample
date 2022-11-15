@@ -2,6 +2,11 @@
 api_key = <binance api key>
 api_secret = <binance app secret>
 
+[bitkub]
+# การเชื่อมต่อไป bitkub (อยู่ระหว่างการพัฒนา)
+api_key = <bitkub api key>
+api_secret = <bitkub app secret>
+
 [line]
 notify_token = <line notify token>
 
@@ -16,6 +21,7 @@ ema_slow = 32
 macd_fast = 12
 macd_slow = 26
 macd_signal = 9
+rsi_period = 14
 
 # จำนวนวันย้อนหลัง สำหรับใช้ตรวจสัญญาน
 back_days = 3

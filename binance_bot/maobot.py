@@ -9,7 +9,7 @@ import pathlib
 
 async def main():
     app = App(
-        name = 'App',
+        name = 'MaoBot',
         exchange = Binance(api_key=config.API_KEY, api_secret=config.API_SECRET),
         trading_strategy = TradingStrategy(),
         record_trade = RecordLiveTrade(['record_live_trade','my_trade.csv'])
