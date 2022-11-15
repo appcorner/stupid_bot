@@ -1,5 +1,9 @@
 # stupid_bot
 
+## binance_bot (mao bot strategy)
+
+uses binance_bot for testing, make a mao bot strategy (ema+macd), capture signal and send line notify
+
     cd binance_bot
 
 ## pip
@@ -7,11 +11,16 @@
     pip install python-binance
     pip install mplfinance
 
-## config.ini
+## config.ini (rename จาก config.ini.sample)
 
     [binance]
     api_key = <binance api key>
     api_secret = <binance app secret>
+
+    [bitkub]
+    # การเชื่อมต่อไป bitkub (อยู่ระหว่างการพัฒนา)
+    api_key = <bitkub api key>
+    api_secret = <bitkub app secret>
 
     [line]
     notify_token = <line notify token>
