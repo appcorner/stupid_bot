@@ -14,6 +14,14 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
+# ansi escape code
+CLS_SCREEN = '\033[2J'
+SHOW_CURSOR = '\033[?25h'
+HIDE_CURSOR = '\033[?25l'
+CGREEN  = '\33[32m'
+CEND = '\033[0m'
+CBOLD = '\33[1m'
+
 # กำหนดเวลาที่ต้องการเลื่อนการอ่านข้อมูล เป็นจำนวนวินาที
 TIME_SHIFT = 5
 
@@ -159,13 +167,13 @@ async def update_all_balance(exchange, marginType):
     positions = balance['info']['positions']
     all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
         columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
-    print("all_positions ====================")
+    print("all_positions ================")
     print(all_positions)
+    print("countTrade ===================", len(all_positions))
 
     freeBalance =  await exchange.fetch_free_balance()
     balance_entry = float(freeBalance[marginType])
-    print("balance_entry ====================")
-    print(balance_entry)
+    print("balance_entry ================", balance_entry)
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
@@ -261,15 +269,7 @@ async def go_trade(exchange, symbol, limitTrade):
     positionAmt = 0.0
     
     countTrade = len(all_positions)
-    # currentPositions = [position for position in all_positions if position['symbol'] == symbol]
-    
-    # positionInfo = pd.DataFrame(currentPositions, columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
     positionInfo = all_positions.loc[all_positions['symbol']==symbol]
-    if symbol == 'BTCUSDT':
-        print("countTrade ====================")
-        print(countTrade)
-        print("positionInfo ====================")
-        print(positionInfo)
 
     #market_info = pd.DataFrame(await exchange.fapiPrivate_get_positionrisk(), columns=["symbol", "entryPrice", "leverage" ,"unrealizedProfit", "isolatedWallet", "positionAmt"])
 
@@ -290,8 +290,8 @@ async def go_trade(exchange, symbol, limitTrade):
 
     # print(countTrade, positionAmt, hasLongPosition, hasShortPosition, amount)
 
-    # if positionAmt == 0:
-    #     await cancelorder(exchange,symbol)
+    if positionAmt == 0:
+        await cancel_order(exchange,symbol)
 
     try:
         signalIdx = -1
@@ -302,19 +302,6 @@ async def go_trade(exchange, symbol, limitTrade):
         # ลง-หมี
         isBearish = (fast[0] > slow[0] and fast[1] < slow[1])
         # print(symbol, isBullish, isBearish, fast, slow)
-        # if symbol == "BTCUSDT":
-        #     print('=================');
-        #     for si in range(-3,0):
-        #         si_fast = df.iloc[si]['fast']
-        #         si_slow = df.iloc[si]['slow']
-        #         print(f'[{si}] Fast : {si_fast:0.5f}  Slow : {si_slow:0.5f}')
-        #     print('=================');
-        #     if isBullish:
-        #         print('# Bullish Crossover -> LONG')
-        #     elif isBearish:
-        #         print('# Bearish Crossover -> SHORT')
-        #     else:
-        #         print('no signal')
 
         if isBullish == True:
             # print(symbol, 'isBullish')
@@ -388,6 +375,11 @@ async def go_trade(exchange, symbol, limitTrade):
 
 async def main():
     # global all_candles
+
+    # set cursor At top, left (1,1)
+    print(CLS_SCREEN+"\033[1;1H", end='')
+    gather(waiting())
+
     exchange = ccxt.binance({
         "apiKey": config.API_KEY,
         "secret": config.API_SECRET,
@@ -446,24 +438,17 @@ async def main():
     # แสดงข้อมูลตัวอย่างของ BTCUSDT
     # print(all_candles['BTCUSDT'].head(3))
     # print(all_candles['BTCUSDT'].tail(5))
-    
-    count = 0
-    SHOW_CURSOR = '\033[?25h'
-    HIDE_CURSOR = '\033[?25l'
-    CGREEN  = '\33[32m'
-    CEND = '\033[0m'
-    CBOLD = '\33[1m'
-    status = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
     try:
-        print(HIDE_CURSOR, end="")
-
         next_ticker = time.time()
         next_ticker -= (next_ticker % time_wait) # ตั้งรอบเวลา
         next_ticker += time_wait # กำหนดรอบเวลาถัดไป
         while True:
             seconds = time.time()
             if seconds >= next_ticker + TIME_SHIFT: # ครบรอบ
+                # set cursor At top, left (1,1)
+                print(CLS_SCREEN+"\033[1;1H", end='')
+
                 local_time = time.ctime(seconds)
                 print(f'\rเริ่มเช็คค่าอินดิเคเตอร์ ที่ {local_time}')
                 
@@ -501,20 +486,27 @@ async def main():
                 # t2=(time.time())-t1
                 # print(f'Total time trade : {t2:0.2f} seconds')
 
-                break
+                # break
 
             await sleep(1)
-            print('\r'+CGREEN+CBOLD+status[count%len(status)]+' waiting...'+CEND, end='')
-            count += 1
-            count = count%len(status)
 
     except KeyboardInterrupt:
         print('exit')
 
     finally:
         await exchange.close()
-        print(SHOW_CURSOR, end="")
+
+async def waiting():
+    count = 0
+    status = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    while True:
+        await sleep(1)
+        print('\r'+CGREEN+CBOLD+status[count%len(status)]+' waiting...\r'+CEND, end='')
+        count += 1
+        count = count%len(status)
 
 if __name__ == "__main__":
+    print(HIDE_CURSOR, end="")
     loop = get_event_loop()
     loop.run_until_complete(main())
+    print(SHOW_CURSOR, end="")
