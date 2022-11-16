@@ -29,34 +29,6 @@ TIMEFRAME_SECONDS = {
 CANDLE_LIMIT = 1000
 
 # ----------------------------------------------------------------------------
-# config variable
-# ----------------------------------------------------------------------------
-# timeframe = '5m'
-# MarginType = 'USDT'
-
-# Trade_Mode = 'off'
-# Long='on'
-# Short ='on'
-# automaxLeverage ='off'
-# Leverage = 20
-# CostType = '$'
-# CostAmount = 1.5
-# limit_Trade = 5
-# Not_Trade = 10
-# TPSL_Mode = 'on'
-# TP = 10
-# TPclose = 50
-# SL = 4
-# Trailing_Stop_Mode ='on'
-# Callback = 5
-# Active_TL = 10
-
-# Fast_Type = 'EMA'
-# Fast_Value = 8
-# Slow_Type = 'EMA'
-# Slow_Value = 34
-
-# ----------------------------------------------------------------------------
 # global variable
 # ----------------------------------------------------------------------------
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
