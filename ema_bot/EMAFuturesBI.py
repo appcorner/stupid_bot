@@ -15,7 +15,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 # ansi escape code
-CLS_SCREEN = '\033[2J'
+CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
 SHOW_CURSOR = '\033[?25h'
 HIDE_CURSOR = '\033[?25l'
 CGREEN  = '\33[32m'
@@ -314,7 +314,7 @@ async def go_trade(exchange, symbol, limitTrade):
                 await cancel_order(exchange, symbol)
             elif config.Long == 'on' and hasLongPosition == False:
                 print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-                if config.Trade_Mode == 'on' and limitTrade >= count_trade and balance_entry > config.Not_Trade:
+                if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
                     print('balance_entry', balance_entry)
@@ -349,7 +349,7 @@ async def go_trade(exchange, symbol, limitTrade):
                 await cancel_order(exchange, symbol)
             elif config.Short == 'on' and hasShortPosition == False:
                 print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-                if config.Trade_Mode == 'on' and limitTrade >= count_trade and balance_entry > config.Not_Trade:
+                if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
                     print('balance_entry', balance_entry)
@@ -382,7 +382,7 @@ async def main():
     # global all_candles
 
     # set cursor At top, left (1,1)
-    print(CLS_SCREEN+"\033[1;1H", end='')
+    print(CLS_SCREEN, end='')
     gather(waiting())
 
     exchange = ccxt.binance({
@@ -452,7 +452,7 @@ async def main():
             seconds = time.time()
             if seconds >= next_ticker + TIME_SHIFT: # ครบรอบ
                 # set cursor At top, left (1,1)
-                print(CLS_SCREEN+"\033[1;1H", end='')
+                print(CLS_SCREEN, end='')
 
                 local_time = time.ctime(seconds)
                 print(f'\rเริ่มเช็คค่าอินดิเคเตอร์ ที่ {local_time}')
