@@ -13,6 +13,8 @@ notify_token = <line notify token>
 timeframe = 1m
 margin_type = USDT
 
+; watch_list = STORJUSDT, ZECUSDT, LUNA2USDT, BCHUSDT, NKNUSDT, BTCUSDT, DOGEUSDT, GALUSDT,GALAUSDT, IOSTUSDT,MATICUSDT,MKRUSDT,NEARUSDT,OCEANUSDT,OMGUSDT,XLMUSDT,XRPUSDT
+
 trade_mode = off
 trade_long = on
 trade_short = on

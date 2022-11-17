@@ -28,6 +28,12 @@ LINE_NOTIFY_TOKEN = config['line']['notify_token']
 timeframe = config['setting']['timeframe']
 MarginType = config['setting']['margin_type']
 
+# ตรวจสอบว่ามีการกำหนดค่า watch_list หรือไม่
+if 'watch_list' in config['setting'].keys():
+    watch_list = [x.strip() for x in config['setting']['watch_list'].split(',')]
+else:
+    watch_list = []
+
 Trade_Mode = config['setting']['trade_mode']
 Long = config['setting']['trade_long']
 Short = config['setting']['trade_short']
