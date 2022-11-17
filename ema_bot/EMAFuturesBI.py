@@ -18,6 +18,7 @@ bot_name = 'EMA Futures Binance, version 1.0'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
+CLS_LINE = '\033[0J'
 SHOW_CURSOR = '\033[?25h'
 HIDE_CURSOR = '\033[?25l'
 CGREEN  = '\33[32m'
@@ -43,14 +44,13 @@ CANDLE_LIMIT = 1000
 # ----------------------------------------------------------------------------
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
-watch_list = {}
-all_symbols = {}
-
 all_positions = pd.DataFrame(columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
 count_trade = 0
 
 balance_entry = 0.0
 
+watch_list = {}
+all_symbols = {}
 all_leverage = {}
 all_candles = {}
 
@@ -137,23 +137,29 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
         print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(0.5+(timestamp-last_candle_time)/timeframe_secs))
         print(type(e).__name__, str(e))
 
-async def set_leverage(exchange, symbol):
+async def set_leverage(exchange, symbol, marginType):
     try:
         if config.automaxLeverage == "on":
-            market_lv = pd.DataFrame(await exchange.fetchMarketLeverageTiers(symbol), columns=["maxLeverage"])
-            leverage = int(market_lv["maxLeverage"][0])
+            symbol_ccxt = all_symbols[symbol]
+            params  = {"settle": marginType.lower()}
+            lv_tiers = await exchange.fetchLeverageTiers([symbol], params=params)
+            leverage = int(lv_tiers[symbol_ccxt][0]['maxLeverage'])
+            # print(symbol, symbol_ccxt, leverage)
             await exchange.set_leverage(leverage, symbol)
         else:
             leverage = config.Leverage
             await exchange.set_leverage(leverage, symbol)
 
-        # เก็บค่า df ไว้ใน object all_leverage เพื่อเอาไปใช้ต่อที่อื่น
+        # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
         all_leverage[symbol] = leverage
     except Exception as e:
         # print(type(e).__name__, str(e))
-        print(symbol, 'Found leverage error bot will Set leverage = 5')
         leverage = 5
-        # เก็บค่า df ไว้ใน object all_leverage เพื่อเอาไปใช้ต่อที่อื่น
+        if type(e).__name__ == 'ExchangeError' and '-4300' in str(e):
+            leverage = 20
+        print(symbol, f'found leverage error, bot will set leverage = {leverage}')
+
+        # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
         all_leverage[symbol] = leverage
         try:
             await exchange.set_leverage(leverage, symbol)
@@ -266,8 +272,7 @@ async def go_trade(exchange, symbol, limitTrade):
     if symbol in all_leverage.keys():
         leverage = all_leverage[symbol]
     else:
-        # set default 5 if symbol is not found
-        leverage = 5
+        print(f'ไม่พบข้อมูล leverage ของ {symbol}')
         return
 
     hasLongPosition = False
@@ -385,7 +390,7 @@ async def go_trade(exchange, symbol, limitTrade):
         pass
 
 async def main():
-    # global all_candles
+    global all_symbols, watch_list
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_name)
@@ -408,11 +413,12 @@ async def main():
     # print(mdf.head())
     drop_value = ['BTCUSDT_221230','ETHUSDT_221230']
     all_symbols = {r['id'] : r['symbol'] for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol']].to_dict('records')}
+    # print(all_symbols)
     if len(config.watch_list) > 0:
         watch_list = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
     else:
         watch_list = all_symbols.keys()
-    # print(watch_list)
+    print(watch_list)
     t2=(time.time())-t1
     print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
     print(f'จำนวนเหรียญ ทั้งหมด : {len(all_symbols.keys())} เหรียญ')
@@ -423,8 +429,7 @@ async def main():
     )
 
     # set leverage
-    # print(all_leverage)
-    loops = [set_leverage(exchange, symbol) for symbol in watch_list]
+    loops = [set_leverage(exchange, symbol, config.MarginType) for symbol in watch_list]
     await gather(*loops)
     # แสดงค่า leverage
     # print(all_leverage)
@@ -501,6 +506,6 @@ if __name__ == "__main__":
         loop = get_event_loop()
         loop.run_until_complete(main())
     except KeyboardInterrupt:
-        print('\rbye\n')
+        print(CLS_LINE+'\rbye')
     finally:
         print(SHOW_CURSOR, end="")
