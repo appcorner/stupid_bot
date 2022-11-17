@@ -14,6 +14,8 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
+bot_name = 'EMA Futures Binance, version 1.0'
+
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
 SHOW_CURSOR = '\033[?25h'
@@ -41,6 +43,9 @@ CANDLE_LIMIT = 1000
 # ----------------------------------------------------------------------------
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
+watch_list = {}
+all_symbols = {}
+
 all_positions = pd.DataFrame(columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
 count_trade = 0
 
@@ -48,7 +53,6 @@ balance_entry = 0.0
 
 all_leverage = {}
 all_candles = {}
-
 
 def add_indicator(symbol, bars):
     df = pd.DataFrame(
@@ -314,7 +318,7 @@ async def go_trade(exchange, symbol, limitTrade):
                 await cancel_order(exchange, symbol)
             elif config.Long == 'on' and hasLongPosition == False:
                 # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-                print(symbol, 'LONG', count_trade, balance_entry, "{:.4f}".format(priceEntry), "{:.4f}".format(amount))
+                print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
                 if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
@@ -350,7 +354,7 @@ async def go_trade(exchange, symbol, limitTrade):
                 await cancel_order(exchange, symbol)
             elif config.Short == 'on' and hasShortPosition == False:
                 # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-                print(symbol, 'SHORT', count_trade, balance_entry, "{:.4f}".format(priceEntry), "{:.4f}".format(amount))
+                print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
                 if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
@@ -384,7 +388,8 @@ async def main():
     # global all_candles
 
     # set cursor At top, left (1,1)
-    print(CLS_SCREEN, end='')
+    print(CLS_SCREEN+bot_name)
+
     # แสดง status waiting ระหว่างที่รอ...
     gather(waiting())
 
@@ -397,16 +402,21 @@ async def main():
     t1=time.time()
     markets = await exchange.fetch_markets()
     # print(markets[0])
-    mdf = pd.DataFrame(markets, columns=['id','quote'])
+    mdf = pd.DataFrame(markets, columns=['id','quote','symbol'])
     mdf.drop(mdf[mdf.quote != 'USDT'].index, inplace=True)
     # print(mdf.columns)
     # print(mdf.head())
     drop_value = ['BTCUSDT_221230','ETHUSDT_221230']
-    symbols = mdf[~mdf['id'].isin(drop_value)]['id'].to_list()
-    # print(symbols)
+    all_symbols = {r['id'] : r['symbol'] for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol']].to_dict('records')}
+    if len(config.watch_list) > 0:
+        watch_list = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
+    else:
+        watch_list = all_symbols.keys()
+    # print(watch_list)
     t2=(time.time())-t1
     print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
-    print(f'จำนวนเหรียญ : {len(symbols)} เหรียญ')
+    print(f'จำนวนเหรียญ ทั้งหมด : {len(all_symbols.keys())} เหรียญ')
+    print(f'จำนวนเหรียญ เป้าหมาย : {len(watch_list)} เหรียญ')
 
     kwargs = dict(
         limitTrade=config.limit_Trade,
@@ -414,7 +424,7 @@ async def main():
 
     # set leverage
     # print(all_leverage)
-    loops = [set_leverage(exchange, symbol) for symbol in symbols]
+    loops = [set_leverage(exchange, symbol) for symbol in watch_list]
     await gather(*loops)
     # แสดงค่า leverage
     # print(all_leverage)
@@ -433,7 +443,7 @@ async def main():
     print(f'เริ่มอ่านแท่งเทียนทุกเหรียญ ที่ {local_time}')
 
     # อ่านแท่งเทียนแบบ async แต่ ยังไม่เทรด
-    loops = [fetch_ohlcv(exchange, symbol, config.timeframe, limit) for symbol in symbols]
+    loops = [fetch_ohlcv(exchange, symbol, config.timeframe, limit) for symbol in watch_list]
     await gather(*loops)
     
     t2=(time.time())-t1
@@ -447,7 +457,7 @@ async def main():
             seconds = time.time()
             if seconds >= next_ticker + TIME_SHIFT: # ครบรอบ
                 # set cursor At top, left (1,1)
-                print(CLS_SCREEN, end='')
+                print(CLS_SCREEN+bot_name)
 
                 local_time = time.ctime(seconds)
                 print(f'\rเริ่มเช็คค่าอินดิเคเตอร์ ที่ {local_time}')
@@ -460,7 +470,7 @@ async def main():
                 limit = 0
 
                 # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
-                loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit, next_ticker, **kwargs) for symbol in symbols]
+                loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit, next_ticker, **kwargs) for symbol in watch_list]
                 await gather(*loops)
 
                 next_ticker += time_wait # กำหนดรอบเวลาถัดไป
@@ -468,22 +478,10 @@ async def main():
                 t2=(time.time())-t1
                 print(f'ตรวจสอบอินดิเคเตอร์ทุกเหรียญใช้เวลา : {t2:0.2f} วินาที')
 
-
-                # trade all symbols after all candles close
-                # t1=time.time()
-
-                # loops = [go_trade(exchange, symbol, config.limit_Trade) for symbol in symbols]
-                # await gather(*loops)
-
-                # t2=(time.time())-t1
-                # print(f'Total time trade : {t2:0.2f} seconds')
-
-                # break
-
             await sleep(1)
 
     except KeyboardInterrupt:
-        print('exit')
+        pass
 
     finally:
         await exchange.close()
@@ -498,7 +496,11 @@ async def waiting():
         count = count%len(status)
 
 if __name__ == "__main__":
-    print(HIDE_CURSOR, end="")
-    loop = get_event_loop()
-    loop.run_until_complete(main())
-    print(SHOW_CURSOR, end="")
+    try:
+        print(HIDE_CURSOR, end="")
+        loop = get_event_loop()
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        print('\rbye\n')
+    finally:
+        print(SHOW_CURSOR, end="")
