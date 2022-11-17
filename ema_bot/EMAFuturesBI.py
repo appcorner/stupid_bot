@@ -308,7 +308,7 @@ async def go_trade(exchange, symbol, limitTrade):
             # print(symbol, 'isBullish')
             if hasShortPosition == True:
                 count_trade = count_trade-1 if count_trade > 0 else 0
-                await short_close(symbol, positionAmt)
+                await short_close(exchange, symbol, positionAmt)
                 print(f"[{symbol}] สถานะ : Short Exit processing...")
                 notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
                 await cancel_order(exchange, symbol)
@@ -343,7 +343,7 @@ async def go_trade(exchange, symbol, limitTrade):
             # print(symbol, 'isBearish')
             if hasLongPosition == True:
                 count_trade = count_trade-1 if count_trade > 0 else 0
-                await long_close(symbol, positionAmt)
+                await long_close(exchange, symbol, positionAmt)
                 print(f"[{symbol}] สถานะ : Long Exit processing...")
                 notify.Send_Text(f'{symbol}\n สถานะ : Long Exit')
                 await cancel_order(exchange, symbol)
