@@ -313,7 +313,8 @@ async def go_trade(exchange, symbol, limitTrade):
                 notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
                 await cancel_order(exchange, symbol)
             elif config.Long == 'on' and hasLongPosition == False:
-                print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+                # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+                print(symbol, 'LONG', count_trade, balance_entry, "{:.4f}".format(priceEntry), "{:.4f}".format(amount))
                 if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
@@ -348,7 +349,8 @@ async def go_trade(exchange, symbol, limitTrade):
                 notify.Send_Text(f'{symbol}\n สถานะ : Long Exit')
                 await cancel_order(exchange, symbol)
             elif config.Short == 'on' and hasShortPosition == False:
-                print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+                # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+                print(symbol, 'SHORT', count_trade, balance_entry, "{:.4f}".format(priceEntry), "{:.4f}".format(amount))
                 if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
@@ -383,6 +385,7 @@ async def main():
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN, end='')
+    # แสดง status waiting ระหว่างที่รอ...
     gather(waiting())
 
     exchange = ccxt.binance({
@@ -417,32 +420,24 @@ async def main():
     # print(all_leverage)
     print(f'จำนวนค่า leverage ที่คำนวนได้ {len(all_leverage.keys())}')
 
+    # แสดงค่า positions & balance
+    await update_all_balance(exchange, config.MarginType)
+
     time_wait = TIMEFRAME_SECONDS[config.timeframe] # กำหนดเวลาต่อ 1 รอบ
     # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
     limit = CANDLE_LIMIT
 
-    # await update_all_balance(exchange, config.MarginType)
-
-    # อ่านแท่งเทียนย้อนหลัง
+    # อ่านแท่งเทียนทุกเหรียญ
     t1=time.time()
     local_time = time.ctime(t1)
-    print(f'เริ่มอ่านแท่งเทียนย้อนหลัง ที่ {local_time}')
+    print(f'เริ่มอ่านแท่งเทียนทุกเหรียญ ที่ {local_time}')
 
-    # อ่านแท่งเทียนแบบ async 
+    # อ่านแท่งเทียนแบบ async แต่ ยังไม่เทรด
     loops = [fetch_ohlcv(exchange, symbol, config.timeframe, limit) for symbol in symbols]
     await gather(*loops)
-    # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
-    # loops = [fetch_ohlcv_trade(exchange, symbol, timeframe, limit, **kwargs) for symbol in symbols]
-    # await gather(*loops)
     
     t2=(time.time())-t1
     print(f'อ่านแท่งเทียนทุกเหรียญใช้เวลา : {t2:0.2f} วินาที')
-
-    # ตรวจสอบว่าได้ข้อมูลครบจริงไหม
-    # print(f'--> ได้รับข้อมูลแท่งเทียน จำนวน {len(all_candles.keys())} เหรียญ')
-    # แสดงข้อมูลตัวอย่างของ BTCUSDT
-    # print(all_candles['BTCUSDT'].head(3))
-    # print(all_candles['BTCUSDT'].tail(5))
 
     try:
         next_ticker = time.time()
@@ -461,11 +456,9 @@ async def main():
 
                 t1=time.time()
 
-                # กำหนดการอ่านแท่งเทียนแบบ 0=ไม่ระบุจำนวน, n=จำนวน n แท่ง
+                # กำหนด limit การอ่านแท่งเทียนแบบ 0=ไม่ระบุจำนวน, n=จำนวน n แท่ง
                 limit = 0
-                # อ่านแท่งเทียนแบบ async 
-                # loops = [fetch_ohlcv(exchange, symbol, timeframe, limit, next_ticker) for symbol in symbols]
-                # await gather(*loops)
+
                 # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
                 loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit, next_ticker, **kwargs) for symbol in symbols]
                 await gather(*loops)
@@ -475,17 +468,11 @@ async def main():
                 t2=(time.time())-t1
                 print(f'ตรวจสอบอินดิเคเตอร์ทุกเหรียญใช้เวลา : {t2:0.2f} วินาที')
 
-                # ตรวจสอบว่าได้ข้อมูลครบจริงไหม
-                # print(f'--> ได้รับข้อมูลแท่งเทียน จำนวน {len(all_candles.keys())} เหรียญ')
-                # แสดงข้อมูลตัวอย่างของ BTCUSDT
-                # print(all_candles['BTCUSDT'].head(3))
-                # print(all_candles['BTCUSDT'].tail(8))
-                # print(f"จำนวนแท่ง: {len(all_candles['BTCUSDT'])}")
 
-                # trade all symbols
+                # trade all symbols after all candles close
                 # t1=time.time()
 
-                # loops = [go_trade(exchange, symbol, limit_Trade, balanceposition, BalanceEntry) for symbol in symbols]
+                # loops = [go_trade(exchange, symbol, config.limit_Trade) for symbol in symbols]
                 # await gather(*loops)
 
                 # t2=(time.time())-t1
