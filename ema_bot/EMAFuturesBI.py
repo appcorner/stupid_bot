@@ -42,6 +42,7 @@ CANDLE_LIMIT = 1000
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
 all_positions = pd.DataFrame(columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
+count_trade = 0
 
 balance_entry = 0.0
 
@@ -161,7 +162,7 @@ async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0, *
     await gather(go_trade(exchange, symbol, kwargs['limitTrade']))
 
 async def update_all_balance(exchange, marginType):
-    global all_positions, balance_entry
+    global all_positions, balance_entry, count_trade
 
     balance = await exchange.fetch_balance()
     positions = balance['info']['positions']
@@ -169,7 +170,8 @@ async def update_all_balance(exchange, marginType):
         columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
     print("all_positions ================")
     print(all_positions)
-    print("countTrade ===================", len(all_positions))
+    count_trade = len(all_positions)
+    print("countTrade ===================", count_trade)
 
     freeBalance =  await exchange.fetch_free_balance()
     balance_entry = float(freeBalance[marginType])
@@ -248,7 +250,7 @@ async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
     return
 #-------------------------------------------------------------------------------
 async def go_trade(exchange, symbol, limitTrade):
-    global all_positions, balance_entry
+    global all_positions, balance_entry, count_trade
 
     # อ่านข้อมูลแท่งเทียนที่เก็บไว้ใน all_candles
     if symbol in all_candles.keys() and len(all_candles[symbol]) >= CANDLE_LIMIT:
@@ -268,7 +270,6 @@ async def go_trade(exchange, symbol, limitTrade):
     hasShortPosition = False
     positionAmt = 0.0
     
-    countTrade = len(all_positions)
     positionInfo = all_positions.loc[all_positions['symbol']==symbol]
 
     #market_info = pd.DataFrame(await exchange.fapiPrivate_get_positionrisk(), columns=["symbol", "entryPrice", "leverage" ,"unrealizedProfit", "isolatedWallet", "positionAmt"])
@@ -306,16 +307,18 @@ async def go_trade(exchange, symbol, limitTrade):
         if isBullish == True:
             # print(symbol, 'isBullish')
             if hasShortPosition == True:
+                count_trade = count_trade-1 if count_trade > 0 else 0
                 await short_close(symbol, positionAmt)
                 print(f"[{symbol}] สถานะ : Short Exit processing...")
                 notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
                 await cancel_order(exchange, symbol)
             elif config.Long == 'on' and hasLongPosition == False:
-                print(symbol, config.Trade_Mode, limitTrade, countTrade, balance_entry, config.Not_Trade, priceEntry, amount)
-                if config.Trade_Mode == 'on' and limitTrade >= countTrade and balance_entry > config.Not_Trade:
+                print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+                if config.Trade_Mode == 'on' and limitTrade >= count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
                     print('balance_entry', balance_entry)
+                    count_trade += 1
                     await long_enter(exchange, symbol, amount)
                     print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                     await cancel_order(exchange, symbol)
@@ -339,16 +342,18 @@ async def go_trade(exchange, symbol, limitTrade):
         elif isBearish == True:
             # print(symbol, 'isBearish')
             if hasLongPosition == True:
+                count_trade = count_trade-1 if count_trade > 0 else 0
                 await long_close(symbol, positionAmt)
                 print(f"[{symbol}] สถานะ : Long Exit processing...")
                 notify.Send_Text(f'{symbol}\n สถานะ : Long Exit')
                 await cancel_order(exchange, symbol)
             elif config.Short == 'on' and hasShortPosition == False:
-                print(symbol, config.Trade_Mode, limitTrade, countTrade, balance_entry, config.Not_Trade, priceEntry, amount)
-                if config.Trade_Mode == 'on' and limitTrade >= countTrade and balance_entry > config.Not_Trade:
+                print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+                if config.Trade_Mode == 'on' and limitTrade >= count_trade and balance_entry > config.Not_Trade:
                     # ปรับปรุงค่า balance_entry
                     balance_entry -= (amount * priceEntry / leverage)
                     print('balance_entry', balance_entry)
+                    count_trade += 1
                     await short_enter(exchange, symbol, amount)
                     print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                     await cancel_order(exchange, symbol)
