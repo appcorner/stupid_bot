@@ -141,7 +141,7 @@ async def set_leverage(exchange, symbol, marginType):
     try:
         if config.automaxLeverage == "on":
             symbol_ccxt = all_symbols[symbol]
-            params  = {"settle": marginType.lower()}
+            params  = {"settle": marginType}
             lv_tiers = await exchange.fetchLeverageTiers([symbol], params=params)
             leverage = int(lv_tiers[symbol_ccxt][0]['maxLeverage'])
             # print(symbol, symbol_ccxt, leverage)
@@ -418,7 +418,7 @@ async def main():
         watch_list = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
     else:
         watch_list = all_symbols.keys()
-    print(watch_list)
+    # print(watch_list)
     t2=(time.time())-t1
     print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
     print(f'จำนวนเหรียญ ทั้งหมด : {len(all_symbols.keys())} เหรียญ')
