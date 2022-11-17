@@ -205,10 +205,10 @@ async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
     }
     params['stopPrice'] = pricetp
     order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'sell', (amount*closetp), PriceEntry, params)
-    time.sleep(1)
+    await sleep(1)
     params['stopPrice'] = pricesl
     order = await exchange.create_order(symbol, 'STOP_MARKET', 'sell', amount, PriceEntry, params)
-    time.sleep(1)
+    await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def long_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
@@ -219,7 +219,7 @@ async def long_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
         'reduceOnly': True
     }
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
-    time.sleep(1)
+    await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
@@ -230,10 +230,10 @@ async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
     }
     params['stopPrice'] = pricetp
     order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'buy', (amount*closetp), PriceEntry, params)
-    time.sleep(1)
+    await sleep(1)
     params['stopPrice'] = pricesl
     order = await exchange.create_order(symbol, 'STOP_MARKET', 'buy', amount, PriceEntry, params)                   
-    time.sleep(1)
+    await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
@@ -244,7 +244,7 @@ async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
         'reduceOnly': True
     }
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
-    time.sleep(1)
+    await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def go_trade(exchange, symbol, limitTrade):

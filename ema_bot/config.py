@@ -35,7 +35,6 @@ automaxLeverage = config['setting']['auto_max_leverage']
 Leverage = int(config['setting']['leverage'])
 CostType = config['setting']['cost_type']
 CostAmount = float(config['setting']['cost_amount'])
-# Cost = config['setting']['cost']
 limit_Trade = float(config['setting']['limit_trade'])
 Not_Trade = float(config['setting']['not_trade'])
 TPSL_Mode = config['setting']['tpsl_mode']
