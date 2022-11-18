@@ -2,10 +2,6 @@
 api_key = <binance api key>
 api_secret = <binance app secret>
 
-[bitkub]
-api_key = <bitkub api key>
-api_secret = <bitkub app secret>
-
 [line]
 notify_token = <line notify token>
 
@@ -25,7 +21,6 @@ cost_amount = 1.5
 limit_trade = 5
 not_trade = 10
 tpsl_mode = on
-tp_rate = 10
 tp_close = 50
 sl_rate = 4
 trailing_stop_mode = on

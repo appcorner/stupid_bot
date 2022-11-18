@@ -1,5 +1,38 @@
 import configparser
 
+def get_list(group, name, default=[]):
+    value = default
+    if group in config.keys() and name in config[group].keys():
+        value = [x.strip() for x in config[group][name].split(',')]
+    else:
+        print(f'config {group}.{name} not found, set default to {default}')
+    return value
+
+def get_str(group, name, default=''):
+    value = default
+    if group in config.keys() and name in config[group].keys():
+        value = config[group][name]
+    else:
+        print(f'config {group}.{name} not found, set default to {default}')
+    return value
+
+def get_int(group, name, default=0):
+    value = default
+    if group in config.keys() and name in config[group].keys():
+        value = int(config[group][name])
+    else:
+        print(f'config {group}.{name} not found, set default to {default}')
+    return value
+
+def get_float(group, name, default=0.0):
+    value = default
+    if group in config.keys() and name in config[group].keys():
+        value = float(config[group][name])
+    else:
+        print(f'config {group}.{name} not found, set default to {default}')
+    return value
+
+
 config = configparser.ConfigParser(interpolation=None)
 config.optionxform = str
 config_file = open("config.ini", encoding="utf8")
@@ -8,50 +41,46 @@ config.readfp(config_file)
 #------------------------------------------------------------
 # binance
 #------------------------------------------------------------
-API_KEY = config['binance']['api_key']
-API_SECRET = config['binance']['api_secret']
+API_KEY = get_str('binance','api_key')
+API_SECRET = get_str('binance','api_secret')
 
 #------------------------------------------------------------
 # bitkub
 #------------------------------------------------------------
-BK_API_KEY = config['bitkub']['api_key']
-BK_API_SECRET = config['bitkub']['api_secret']
+# BK_API_KEY = get_str('bitkub','api_key')
+# BK_API_SECRET = get_str('bitkub','api_secret')
 
 #------------------------------------------------------------
 # line
 #------------------------------------------------------------
-LINE_NOTIFY_TOKEN = config['line']['notify_token']
+LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 
 #------------------------------------------------------------
 # setting
 #------------------------------------------------------------
-timeframe = config['setting']['timeframe']
-MarginType = config['setting']['margin_type']
+timeframe = get_str('setting', 'timeframe')
+MarginType = get_str('setting', 'margin_type')
 
-# ตรวจสอบว่ามีการกำหนดค่า watch_list หรือไม่
-if 'watch_list' in config['setting'].keys():
-    watch_list = [x.strip() for x in config['setting']['watch_list'].split(',')]
-else:
-    watch_list = []
+watch_list = get_list('setting', 'watch_list')
 
-Trade_Mode = config['setting']['trade_mode']
-Long = config['setting']['trade_long']
-Short = config['setting']['trade_short']
-automaxLeverage = config['setting']['auto_max_leverage']
-Leverage = int(config['setting']['leverage'])
-CostType = config['setting']['cost_type']
-CostAmount = float(config['setting']['cost_amount'])
-limit_Trade = float(config['setting']['limit_trade'])
-Not_Trade = float(config['setting']['not_trade'])
-TPSL_Mode = config['setting']['tpsl_mode']
-TP = float(config['setting']['tp_rate'])
-TPclose = float(config['setting']['tp_close'])
-SL = float(config['setting']['sl_rate'])
-Trailing_Stop_Mode = config['setting']['trailing_stop_mode']
-Callback = float(config['setting']['callback'])
-Active_TL = float(config['setting']['active_tl_rate'])
+Trade_Mode = get_str('setting', 'trade_mode')
+Long = get_str('setting', 'trade_long')
+Short = get_str('setting', 'trade_short')
+automaxLeverage = get_str('setting', 'auto_max_leverage')
+Leverage = get_int('setting', 'leverage')
+CostType = get_str('setting', 'cost_type')
+CostAmount = get_float('setting', 'cost_amount')
+limit_Trade = get_float('setting', 'limit_trade')
+Not_Trade = get_float('setting', 'not_trade')
+TPSL_Mode = get_str('setting', 'tpsl_mode')
+TP = get_float('setting', 'tp_rate')
+TPclose = get_float('setting', 'tp_close')
+SL = get_float('setting', 'sl_rate')
+Trailing_Stop_Mode = get_str('setting', 'trailing_stop_mode')
+Callback = get_float('setting', 'callback')
+Active_TL = get_float('setting', 'active_tl_rate')
 
-Fast_Type = config['setting']['fast_type']
-Fast_Value = int(config['setting']['fast_value'])
-Slow_Type = config['setting']['slow_type']
-Slow_Value = int(config['setting']['slow_value'])
+Fast_Type = get_str('setting', 'fast_type')
+Fast_Value = get_int('setting', 'fast_value')
+Slow_Type = get_str('setting', 'slow_type')
+Slow_Value = get_int('setting', 'slow_value')
