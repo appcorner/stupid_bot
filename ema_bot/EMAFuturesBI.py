@@ -30,10 +30,15 @@ TIME_SHIFT = 5
 
 TIMEFRAME_SECONDS = {
     '1m': 60,
+    '3m': 60*3,
     '5m': 60*5,
     '15m': 60*15,
+    '30m': 60*15,
     '1h': 60*60,
+    '2h': 60*60*2,
     '4h': 60*60*4,
+    '6h': 60*60*6,
+    '12h': 60*60*12,
     '1d': 60*60*24,
 }
 
@@ -150,8 +155,9 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             all_candles[symbol] = add_indicator(symbol, ohlcv_bars)
             # print(symbol)
     except Exception as ex:
-        print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
         print(type(ex).__name__, str(ex))
+        if limit == 0 and symbol in all_candles.keys():
+            print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
 
 async def set_leverage(exchange, symbol, marginType):
     try:
@@ -436,10 +442,12 @@ async def main():
     all_symbols = {r['id'] : r['symbol'] for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol']].to_dict('records')}
     # print(all_symbols)
     if len(config.watch_list) > 0:
-        watch_list = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
+        watch_list_tmp = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
     else:
-        watch_list = all_symbols.keys()
-    # print(watch_list)
+        watch_list_tmp = all_symbols.keys()
+    # remove sysbol if in back_list
+    watch_list = list(filter(lambda x: x not in config.back_list, watch_list_tmp))
+    print(watch_list)
     t2=(time.time())-t1
     # print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
     print(f'total     : {len(all_symbols.keys())} symbols')

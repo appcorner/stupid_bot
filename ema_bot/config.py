@@ -59,10 +59,15 @@ LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 # setting
 #------------------------------------------------------------
 timeframe = get_str('setting', 'timeframe')
+
 SignalIndex = get_int('setting', 'signal_index', -2)
+if SignalIndex > -1 or SignalIndex < -2:
+    SignalIndex = -2
+
 MarginType = get_str('setting', 'margin_type')
 
 watch_list = get_list('setting', 'watch_list')
+back_list = get_list('setting', 'back_list')
 
 Trade_Mode = get_str('setting', 'trade_mode')
 Long = get_str('setting', 'trade_long')
