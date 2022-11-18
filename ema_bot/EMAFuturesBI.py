@@ -4,6 +4,7 @@ import pandas_ta as ta
 import time
 from LineNotify import LineNotify
 import config
+import os
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -14,7 +15,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures Binance, version 1.1'
+bot_name = 'EMA Futures Binance, version 1.2'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -201,15 +202,15 @@ async def update_all_balance(exchange, marginType):
     all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
         # columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
         columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
-    # print("all_positions ================")
-    print(all_positions)
     count_trade = len(all_positions)
-    print("countTrade ===================", count_trade)
-
     freeBalance =  await exchange.fetch_free_balance()
     balance_entry = float(freeBalance[marginType])
     profit_loss = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
-    print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
+    if config.Trade_Mode == 'on':
+        # print("all_positions ================")
+        print(all_positions)
+        print("countTrade ===================", count_trade)
+        print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
@@ -340,14 +341,14 @@ async def go_trade(exchange, symbol, limitTrade):
         isBearishExit = (fast[0] > mid[0] and fast[1] < mid[1])
         # print(symbol, isBullish, isBearish, fast, slow)
 
-        if isBullishExit == True and hasShortPosition == True:
+        if config.Trade_Mode == 'on' and isBullishExit == True and hasShortPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await short_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Short Exit processing...")
             notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
             await cancel_order(exchange, symbol)
 
-        elif isBearishExit == True and hasLongPosition == True:
+        elif config.Trade_Mode == 'on' and isBearishExit == True and hasLongPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await long_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Long Exit processing...")
@@ -435,7 +436,7 @@ async def main():
     markets = await exchange.fetch_markets()
     # print(markets[0])
     mdf = pd.DataFrame(markets, columns=['id','quote','symbol'])
-    mdf.drop(mdf[mdf.quote != 'USDT'].index, inplace=True)
+    mdf.drop(mdf[mdf.quote != config.MarginType].index, inplace=True)
     # print(mdf.columns)
     # print(mdf.head())
     drop_value = ['BTCUSDT_221230','ETHUSDT_221230']
@@ -447,7 +448,7 @@ async def main():
         watch_list_tmp = all_symbols.keys()
     # remove sysbol if in back_list
     watch_list = list(filter(lambda x: x not in config.back_list, watch_list_tmp))
-    print(watch_list)
+    # print(watch_list)
     t2=(time.time())-t1
     # print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
     print(f'total     : {len(all_symbols.keys())} symbols')
@@ -518,9 +519,9 @@ async def main():
                 t2=(time.time())-t1
                 print(f'total time : {t2:0.2f} secs')
 
-                await sleep(15)
+                await sleep(10)
 
-            elif seconds >= next_ticker_1m + TIME_SHIFT:
+            elif config.Trade_Mode == 'on' and seconds >= next_ticker_1m + TIME_SHIFT:
                 # set cursor At top, left (1,1)
                 print(CLS_SCREEN+bot_name)
                 balance_time = time.ctime(seconds)
@@ -550,6 +551,7 @@ async def waiting():
 
 if __name__ == "__main__":
     try:
+        os.system("color") # enables ansi escape characters in terminal
         print(HIDE_CURSOR, end="")
         loop = get_event_loop()
         loop.run_until_complete(main())
