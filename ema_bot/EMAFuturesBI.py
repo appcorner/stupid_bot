@@ -75,6 +75,7 @@ def add_indicator(symbol, bars):
 
     # คำนวนค่าต่างๆใหม่
     df['fast'] = 0
+    df['mid'] = 0
     df['slow'] = 0
 
     try:
@@ -91,6 +92,19 @@ def add_indicator(symbol, bars):
             df['fast'] = ta.wma(df['close'],config.Fast_Value)
         elif config.Fast_Type == 'VWMA':
             df['fast'] = ta.vwma(df['close'],df['volume'],config.Fast_Value)
+
+        if config.Mid_Type == 'EMA':
+            df['mid'] = ta.ema(df['close'],config.Mid_Value)
+        elif config.Mid_Type == 'SMA':
+            df['mid'] = ta.sma(df['close'],config.Mid_Value)
+        elif config.Mid_Type == 'HMA':
+            df['mid'] = ta.hma(df['close'],config.Mid_Value)
+        elif config.Mid_Type == 'RMA':
+            df['mid'] = ta.rma(df['close'],config.Mid_Value)
+        elif config.Mid_Type == 'WMA':
+            df['mid'] = ta.wma(df['close'],config.Mid_Value)
+        elif config.Mid_Type == 'VWMA':
+            df['mid'] = ta.vwma(df['close'],df['volume'],config.Mid_Value)
 
         if config.Slow_Type == 'EMA':
             df['slow'] = ta.ema(df['close'],config.Slow_Value)
@@ -308,86 +322,89 @@ async def go_trade(exchange, symbol, limitTrade):
         await cancel_order(exchange,symbol)
 
     try:
-        signalIdx = -1
+        signalIdx = config.SignalIndex
         fast = (df.iloc[signalIdx-1]['fast'], df.iloc[signalIdx]['fast'])
+        mid = (df.iloc[signalIdx-1]['mid'], df.iloc[signalIdx]['mid'])
         slow = (df.iloc[signalIdx-1]['slow'], df.iloc[signalIdx]['slow'])
         # ขึ้น-กระทิง
         isBullish = (fast[0] < slow[0] and fast[1] > slow[1])
+        isBullishExit = (fast[0] < mid[0] and fast[1] > mid[1])
         # ลง-หมี
         isBearish = (fast[0] > slow[0] and fast[1] < slow[1])
+        isBearishExit = (fast[0] > mid[0] and fast[1] < mid[1])
         # print(symbol, isBullish, isBearish, fast, slow)
 
-        if isBullish == True:
-            # print(symbol, 'isBullish')
-            if hasShortPosition == True:
-                count_trade = count_trade-1 if count_trade > 0 else 0
-                await short_close(exchange, symbol, positionAmt)
-                print(f"[{symbol}] สถานะ : Short Exit processing...")
-                notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
-                await cancel_order(exchange, symbol)
-            elif config.Long == 'on' and hasLongPosition == False:
-                # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-                print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
-                if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
-                    # ปรับปรุงค่า balance_entry
-                    balance_entry -= (amount * priceEntry / leverage)
-                    print('balance_entry', balance_entry)
-                    count_trade += 1
-                    await long_enter(exchange, symbol, amount)
-                    print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
-                    await cancel_order(exchange, symbol)
-                    notify.Send_Text(f'{symbol}\n สถานะ : Long\nCross Up')
-                
-                    if config.TPSL_Mode =='on':
-                        pricetp = priceEntry + (priceEntry * (config.TP / 100.0))
-                        pricesl = priceEntry - (priceEntry * (config.SL / 100.0))
-                        await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
-                        print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                        notify.Send_Text(f'{symbol}\n สถานะ : Long set TPSL\nTP: {config.TP}%\nTP close: {config.TPclose}%\nSL: {config.SL}%')
-                    if config.Trailing_Stop_Mode =='on':
-                        pricetpTL = priceEntry +(priceEntry * (config.Active_TL / 100.0))
-                        await long_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
-                        print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                        notify.Send_Text(f'{symbol}\n สถานะ : Long set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
-                # else:
-                #     notify.Send_Text('Canot trade will sent alert only')
-                # Line(symbol,df)
+        if isBullishExit == True and hasShortPosition == True:
+            count_trade = count_trade-1 if count_trade > 0 else 0
+            await short_close(exchange, symbol, positionAmt)
+            print(f"[{symbol}] สถานะ : Short Exit processing...")
+            notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
+            await cancel_order(exchange, symbol)
 
-        elif isBearish == True:
-            # print(symbol, 'isBearish')
-            if hasLongPosition == True:
-                count_trade = count_trade-1 if count_trade > 0 else 0
-                await long_close(exchange, symbol, positionAmt)
-                print(f"[{symbol}] สถานะ : Long Exit processing...")
-                notify.Send_Text(f'{symbol}\n สถานะ : Long Exit')
+        elif isBearishExit == True and hasLongPosition == True:
+            count_trade = count_trade-1 if count_trade > 0 else 0
+            await long_close(exchange, symbol, positionAmt)
+            print(f"[{symbol}] สถานะ : Long Exit processing...")
+            notify.Send_Text(f'{symbol}\n สถานะ : Long Exit')
+            await cancel_order(exchange, symbol)
+
+        if isBullish == True and config.Long == 'on' and hasLongPosition == False:
+            # print(symbol, 'isBullish')
+            # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+            print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
+            if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                # ปรับปรุงค่า balance_entry
+                balance_entry -= (amount * priceEntry / leverage)
+                print('balance_entry', balance_entry)
+                count_trade += 1
+                await long_enter(exchange, symbol, amount)
+                print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-            elif config.Short == 'on' and hasShortPosition == False:
-                # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-                print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
-                if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
-                    # ปรับปรุงค่า balance_entry
-                    balance_entry -= (amount * priceEntry / leverage)
-                    print('balance_entry', balance_entry)
-                    count_trade += 1
-                    await short_enter(exchange, symbol, amount)
-                    print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
-                    await cancel_order(exchange, symbol)
-                    notify.Send_Text(f'{symbol}\n สถานะ : Short\nCross Down')
-                
-                    if config.TPSL_Mode == 'on':
-                        pricetp = priceEntry - (priceEntry * (float(config.TP) / 100.0))
-                        pricesl = priceEntry + (priceEntry * (float(config.SL) / 100.0))
-                        await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
-                        print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                        notify.Send_Text(f'{symbol}\n สถานะ : Short set TPSL\nTP: {config.TP}%\nTP close: {config.TPclose}%\nSL: {config.SL}%')
-                    if config.Trailing_Stop_Mode == 'on':
-                        pricetpTL = priceEntry - (priceEntry * (float(config.Active_TL) / 100.0))
-                        await short_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
-                        print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                        notify.Send_Text(f'{symbol}\n สถานะ : Short set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
-                # else:
-                #     notify.Send_Text('Canot trade will sent alert only')
-                # Line(symbol,df)
+                notify.Send_Text(f'{symbol}\n สถานะ : Long\nCross Up')
+            
+                if config.TPSL_Mode =='on':
+                    pricetp = priceEntry + (priceEntry * (config.TP / 100.0))
+                    pricesl = priceEntry - (priceEntry * (config.SL / 100.0))
+                    await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
+                    print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
+                    notify.Send_Text(f'{symbol}\n สถานะ : Long set TPSL\nTP: {config.TP}%\nTP close: {config.TPclose}%\nSL: {config.SL}%')
+                if config.Trailing_Stop_Mode =='on':
+                    pricetpTL = priceEntry +(priceEntry * (config.Active_TL / 100.0))
+                    await long_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
+                    print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
+                    notify.Send_Text(f'{symbol}\n สถานะ : Long set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+            # else:
+            #     notify.Send_Text('Canot trade will sent alert only')
+            # Line(symbol,df)
+
+        elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
+            # print(symbol, 'isBearish')
+            # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+            print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
+            if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                # ปรับปรุงค่า balance_entry
+                balance_entry -= (amount * priceEntry / leverage)
+                print('balance_entry', balance_entry)
+                count_trade += 1
+                await short_enter(exchange, symbol, amount)
+                print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
+                await cancel_order(exchange, symbol)
+                notify.Send_Text(f'{symbol}\n สถานะ : Short\nCross Down')
+            
+                if config.TPSL_Mode == 'on':
+                    pricetp = priceEntry - (priceEntry * (float(config.TP) / 100.0))
+                    pricesl = priceEntry + (priceEntry * (float(config.SL) / 100.0))
+                    await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
+                    print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
+                    notify.Send_Text(f'{symbol}\n สถานะ : Short set TPSL\nTP: {config.TP}%\nTP close: {config.TPclose}%\nSL: {config.SL}%')
+                if config.Trailing_Stop_Mode == 'on':
+                    pricetpTL = priceEntry - (priceEntry * (float(config.Active_TL) / 100.0))
+                    await short_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
+                    print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
+                    notify.Send_Text(f'{symbol}\n สถานะ : Short set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+            # else:
+            #     notify.Send_Text('Canot trade will sent alert only')
+            # Line(symbol,df)
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))

@@ -7,6 +7,7 @@ notify_token = <line notify token>
 
 [setting]
 timeframe = 1m
+signal_index = -2
 margin_type = USDT
 
 ; watch_list = BTCUSDT,DOGEUSDT,GALUSDT,GALAUSDT,IOSTUSDT,MANAUSDT,NEARUSDT,OCEANUSDT,XLMUSDT,XRPUSDT
@@ -29,5 +30,7 @@ active_tl_rate = 10
 
 fast_type = EMA
 fast_value = 8
+mid_type = EMA
+mid_value = 34
 slow_type = EMA
 slow_value = 34

@@ -35,7 +35,7 @@ def get_float(group, name, default=0.0):
 
 config = configparser.ConfigParser(interpolation=None)
 config.optionxform = str
-config_file = open("config.ini", encoding="utf8")
+config_file = open("config.ini", mode='r', encoding='utf-8-sig')
 config.readfp(config_file)
 
 #------------------------------------------------------------
@@ -59,6 +59,7 @@ LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 # setting
 #------------------------------------------------------------
 timeframe = get_str('setting', 'timeframe')
+SignalIndex = get_int('setting', 'signal_index', -2)
 MarginType = get_str('setting', 'margin_type')
 
 watch_list = get_list('setting', 'watch_list')
@@ -82,5 +83,7 @@ Active_TL = get_float('setting', 'active_tl_rate')
 
 Fast_Type = get_str('setting', 'fast_type')
 Fast_Value = get_int('setting', 'fast_value')
+Mid_Type = get_str('setting', 'mid_type')
+Mid_Value = get_int('setting', 'mid_value')
 Slow_Type = get_str('setting', 'slow_type')
 Slow_Value = get_int('setting', 'slow_value')
