@@ -20,8 +20,9 @@ open futures order by cross signel between fast and slow indicator
     signal_index = -2
     margin_type = USDT
 
-    ; ระบุ symbol ที่ต้องการใน watch_list
+    ; ระบุ symbol ที่ต้องการใน watch_list, back_list
     ; watch_list = BTCUSDT,DOGEUSDT,GALUSDT,GALAUSDT,IOSTUSDT,MANAUSDT,NEARUSDT,OCEANUSDT,XLMUSDT,XRPUSDT
+    ; back_list = FTTUSDT
 
     trade_mode = off
     trade_long = on
