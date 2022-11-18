@@ -10,10 +10,6 @@ open futures order by cross signel between fast and slow indicator
     api_key = <binance api key>
     api_secret = <binance app secret>
 
-    [bitkub]
-    api_key = <bitkub api key>
-    api_secret = <bitkub app secret>
-
     [line]
     notify_token = <line notify token>
 
@@ -22,7 +18,7 @@ open futures order by cross signel between fast and slow indicator
     margin_type = USDT
 
     ; ระบุ symbol ที่ต้องการใน watch_list
-    ; watch_list = STORJUSDT, ZECUSDT, LUNA2USDT, BCHUSDT, NKNUSDT, BTCUSDT, DOGEUSDT, GALUSDT,GALAUSDT, IOSTUSDT,MATICUSDT,MKRUSDT,NEARUSDT,OCEANUSDT,OMGUSDT,XLMUSDT,XRPUSDT
+    ; watch_list = BTCUSDT,DOGEUSDT,GALUSDT,GALAUSDT,IOSTUSDT,MANAUSDT,NEARUSDT,OCEANUSDT,XLMUSDT,XRPUSDT
 
     trade_mode = off
     trade_long = on
