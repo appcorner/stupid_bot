@@ -186,7 +186,8 @@ async def update_all_balance(exchange, marginType):
 
     freeBalance =  await exchange.fetch_free_balance()
     balance_entry = float(freeBalance[marginType])
-    print("balance_entry ================", balance_entry, "change", "{:+g}".format(balance_entry-start_balance_entry))
+    profit_loss = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
+    print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
