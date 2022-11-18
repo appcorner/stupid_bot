@@ -105,8 +105,8 @@ def add_indicator(symbol, bars):
         elif config.Slow_Type == 'VWMA':
             df['slow'] = ta.vwma(df['close'],df['volume'],config.Slow_Value)
 
-    except Exception as e:
-        print(e)
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
 
     return df
 
@@ -126,7 +126,8 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             last_candle_time = int(pd.Timestamp(all_candles[symbol].index[-1]).tz_convert('UTC').timestamp())
             # if symbol == "BTCUSDT":
             #     print('----->', timestamp, last_candle_time, timestamp-last_candle_time, (timestamp-last_candle_time)/timeframe_secs)
-            ohlcv_bars = await exchange.fetch_ohlcv(symbol, timeframe, None, round(0.5+(timestamp-last_candle_time)/timeframe_secs))
+            # ให้อ่านแท่งสำรองเพิ่มอีก 2 แท่ง
+            ohlcv_bars = await exchange.fetch_ohlcv(symbol, timeframe, None, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
             # if symbol == "BTCUSDT":
             #     print('----->', f'จำนวนแท่งใหม่ที่ได้รับ คือ {len(ohlcv_bars)}')
         else:
@@ -134,9 +135,9 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
         if len(ohlcv_bars):
             all_candles[symbol] = add_indicator(symbol, ohlcv_bars)
             # print(symbol)
-    except Exception as e:
-        print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(0.5+(timestamp-last_candle_time)/timeframe_secs))
-        print(type(e).__name__, str(e))
+    except Exception as ex:
+        print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
+        print(type(ex).__name__, str(ex))
 
 async def set_leverage(exchange, symbol, marginType):
     try:
@@ -153,10 +154,10 @@ async def set_leverage(exchange, symbol, marginType):
 
         # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
         all_leverage[symbol] = leverage
-    except Exception as e:
-        # print(type(e).__name__, str(e))
+    except Exception as ex:
+        # print(type(ex).__name__, str(ex))
         leverage = 5
-        if type(e).__name__ == 'ExchangeError' and '-4300' in str(e):
+        if type(ex).__name__ == 'ExchangeError' and '-4300' in str(ex):
             leverage = 20
         print(symbol, f'found leverage error, bot will set leverage = {leverage}')
 
@@ -164,8 +165,8 @@ async def set_leverage(exchange, symbol, marginType):
         all_leverage[symbol] = leverage
         try:
             await exchange.set_leverage(leverage, symbol)
-        except Exception as e:
-            # print(type(e).__name__, str(e))
+        except Exception as ex:
+            # print(type(ex).__name__, str(ex))
             print(symbol, f'skip set leverage for {symbol}')
 
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0, **kwargs):
@@ -178,8 +179,9 @@ async def update_all_balance(exchange, marginType):
     balance = await exchange.fetch_balance()
     positions = balance['info']['positions']
     all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
-        columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
-    print("all_positions ================")
+        # columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
+        columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
+    # print("all_positions ================")
     print(all_positions)
     count_trade = len(all_positions)
     print("countTrade ===================", count_trade)
@@ -268,13 +270,13 @@ async def go_trade(exchange, symbol, limitTrade):
     if symbol in all_candles.keys() and len(all_candles[symbol]) >= CANDLE_LIMIT:
         df = all_candles[symbol]
     else:
-        print(f'ไม่พบข้อมูลแท่งเทียนของ {symbol}')
+        print(f'not found candles for {symbol}')
         return
     # อ่านข้อมูล leverage ที่เก็บไว้ใน all_leverage
     if symbol in all_leverage.keys():
         leverage = all_leverage[symbol]
     else:
-        print(f'ไม่พบข้อมูล leverage ของ {symbol}')
+        print(f'not found leverage for {symbol}')
         return
 
     hasLongPosition = False
@@ -387,8 +389,8 @@ async def go_trade(exchange, symbol, limitTrade):
                 #     notify.Send_Text('Canot trade will sent alert only')
                 # Line(symbol,df)
 
-    except Exception as e:
-        print(type(e).__name__, str(e))
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
         pass
 
 async def main():
@@ -491,6 +493,8 @@ async def main():
                 t2=(time.time())-t1
                 print(f'total time : {t2:0.2f} secs')
 
+                await sleep(15)
+
             elif seconds >= next_ticker_1m + TIME_SHIFT:
                 # set cursor At top, left (1,1)
                 print(CLS_SCREEN+bot_name)
@@ -503,6 +507,9 @@ async def main():
 
     except KeyboardInterrupt:
         pass
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
 
     finally:
         await exchange.close()
@@ -521,7 +528,12 @@ if __name__ == "__main__":
         print(HIDE_CURSOR, end="")
         loop = get_event_loop()
         loop.run_until_complete(main())
+
     except KeyboardInterrupt:
         print(CLS_LINE+'\rbye')
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+
     finally:
         print(SHOW_CURSOR, end="")
