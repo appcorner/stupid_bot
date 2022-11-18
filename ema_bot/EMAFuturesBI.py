@@ -14,7 +14,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures Binance, version 1.0'
+bot_name = 'EMA Futures Binance, version 1.1'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -47,6 +47,7 @@ notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 all_positions = pd.DataFrame(columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
 count_trade = 0
 
+start_balance_entry = 0.0
 balance_entry = 0.0
 
 watch_list = {}
@@ -185,7 +186,7 @@ async def update_all_balance(exchange, marginType):
 
     freeBalance =  await exchange.fetch_free_balance()
     balance_entry = float(freeBalance[marginType])
-    print("balance_entry ================", balance_entry)
+    print("balance_entry ================", balance_entry, "change", "{:+g}".format(balance_entry-start_balance_entry))
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
@@ -390,7 +391,7 @@ async def go_trade(exchange, symbol, limitTrade):
         pass
 
 async def main():
-    global all_symbols, watch_list
+    global all_symbols, watch_list, start_balance_entry
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_name)
@@ -420,9 +421,9 @@ async def main():
         watch_list = all_symbols.keys()
     # print(watch_list)
     t2=(time.time())-t1
-    print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
-    print(f'จำนวนเหรียญ ทั้งหมด : {len(all_symbols.keys())} เหรียญ')
-    print(f'จำนวนเหรียญ เป้าหมาย : {len(watch_list)} เหรียญ')
+    # print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
+    print(f'total     : {len(all_symbols.keys())} symbols')
+    print(f'target    : {len(watch_list)} symbols')
 
     kwargs = dict(
         limitTrade=config.limit_Trade,
@@ -433,31 +434,36 @@ async def main():
     await gather(*loops)
     # แสดงค่า leverage
     # print(all_leverage)
-    print(f'จำนวนค่า leverage ที่คำนวนได้ {len(all_leverage.keys())}')
-
-    # แสดงค่า positions & balance
-    await update_all_balance(exchange, config.MarginType)
+    print(f'#leverage : {len(all_leverage.keys())} symbols')
 
     time_wait = TIMEFRAME_SECONDS[config.timeframe] # กำหนดเวลาต่อ 1 รอบ
+    time_wait_1m = TIMEFRAME_SECONDS['1m'] # กำหนดเวลา update balance ทุก 1m
+
     # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
     limit = CANDLE_LIMIT
 
     # อ่านแท่งเทียนทุกเหรียญ
     t1=time.time()
     local_time = time.ctime(t1)
-    print(f'เริ่มอ่านแท่งเทียนทุกเหรียญ ที่ {local_time}')
+    print(f'get all candles: {local_time}')
 
     # อ่านแท่งเทียนแบบ async แต่ ยังไม่เทรด
     loops = [fetch_ohlcv(exchange, symbol, config.timeframe, limit) for symbol in watch_list]
     await gather(*loops)
     
     t2=(time.time())-t1
-    print(f'อ่านแท่งเทียนทุกเหรียญใช้เวลา : {t2:0.2f} วินาที')
+    print(f'total time : {t2:0.2f} secs')
+
+    # แสดงค่า positions & balance
+    await update_all_balance(exchange, config.MarginType)
+    start_balance_entry = balance_entry
 
     try:
-        next_ticker = time.time()
-        next_ticker -= (next_ticker % time_wait) # ตั้งรอบเวลา
+        start_ticker = time.time()
+        next_ticker = start_ticker - (start_ticker % time_wait) # ตั้งรอบเวลา
         next_ticker += time_wait # กำหนดรอบเวลาถัดไป
+        next_ticker_1m = start_ticker - (start_ticker % time_wait_1m)
+        next_ticker_1m += time_wait_1m
         while True:
             seconds = time.time()
             if seconds >= next_ticker + TIME_SHIFT: # ครบรอบ
@@ -465,7 +471,7 @@ async def main():
                 print(CLS_SCREEN+bot_name)
 
                 local_time = time.ctime(seconds)
-                print(f'\rเริ่มเช็คค่าอินดิเคเตอร์ ที่ {local_time}')
+                print(f'calculate new indicator: {local_time}')
                 
                 await update_all_balance(exchange, config.MarginType)
 
@@ -479,9 +485,18 @@ async def main():
                 await gather(*loops)
 
                 next_ticker += time_wait # กำหนดรอบเวลาถัดไป
+                next_ticker_1m += time_wait_1m
 
                 t2=(time.time())-t1
-                print(f'ตรวจสอบอินดิเคเตอร์ทุกเหรียญใช้เวลา : {t2:0.2f} วินาที')
+                print(f'total time : {t2:0.2f} secs')
+
+            elif seconds >= next_ticker_1m + TIME_SHIFT:
+                # set cursor At top, left (1,1)
+                print(CLS_SCREEN+bot_name)
+                balance_time = time.ctime(seconds)
+                print(f'last indicator: {local_time}, last balance: {balance_time}')
+                await update_all_balance(exchange, config.MarginType)
+                next_ticker_1m += time_wait_1m
 
             await sleep(1)
 
