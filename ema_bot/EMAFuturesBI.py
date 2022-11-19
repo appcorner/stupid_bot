@@ -2,9 +2,11 @@ from asyncio import get_event_loop, gather, sleep
 import pandas as pd
 import pandas_ta as ta
 import time
+import mplfinance as mpf 
 from LineNotify import LineNotify
 import config
 import os
+import pathlib
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -15,7 +17,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures Binance, version 1.2'
+bot_name = 'EMA Futures Binance, version 1.3'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -44,6 +46,7 @@ TIMEFRAME_SECONDS = {
 }
 
 CANDLE_LIMIT = 1000
+CANDLE_PLOT = 100
 
 # ----------------------------------------------------------------------------
 # global variable
@@ -60,6 +63,45 @@ watch_list = {}
 all_symbols = {}
 all_leverage = {}
 all_candles = {}
+
+RSI30 = [30 for i in range(0, CANDLE_PLOT)]
+RSI50 = [50 for i in range(0, CANDLE_PLOT)]
+RSI70 = [70 for i in range(0, CANDLE_PLOT)]
+
+async def line_chart(symbol, df):
+    data = df.tail(CANDLE_PLOT)
+
+    colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
+    added_plots = [
+        mpf.make_addplot(data['fast'],color='red'),
+        mpf.make_addplot(data['mid'],color='orange'),
+        mpf.make_addplot(data['slow'],color='green'),
+        mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue'),
+        mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.75),
+        mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.75),
+        mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.75),
+        mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors),
+        mpf.make_addplot(data['MACDs'],panel=3,color='blue'),
+    ]
+
+    filename = f"./plots/order_{symbol}.png"
+    mpf.plot(
+        data,
+        volume=True,
+        figratio=(8, 6),
+        panel_ratios=(8,2,2,2),
+        type="candle",
+        title=f'{symbol} ({config.timeframe} @ {data.index[-1]})',
+        addplot=added_plots,
+        tight_layout=True,
+        style="yahoo",
+        savefig=filename,
+    )
+
+    notify.Send_Image(symbol, image_path=filename)
+    # await sleep(1)
+    # os.remove(filename)
+    return
 
 def add_indicator(symbol, bars):
     df = pd.DataFrame(
@@ -124,6 +166,23 @@ def add_indicator(symbol, bars):
             df['slow'] = ta.wma(df['close'],config.Slow_Value)
         elif config.Slow_Type == 'VWMA':
             df['slow'] = ta.vwma(df['close'],df['volume'],config.Slow_Value)
+
+        # cal MACD
+        ewm_fast     = df['close'].ewm(span=config.MACD_FAST, adjust=False).mean()
+        ewm_slow     = df['close'].ewm(span=config.MACD_SLOW, adjust=False).mean()
+        df['MACD']   = ewm_fast - ewm_slow
+        df['MACDs']  = df['MACD'].ewm(span=config.MACD_SIGNAL).mean()
+        df['MACDh']  = df['MACD'] - df['MACDs']
+
+        # cal RSI
+        # change = df['close'].diff(1)
+        # gain = change.mask(change<0,0)
+        # loss = change.mask(change>0,0)
+        # avg_gain = gain.ewm(com = config.RSI_PERIOD-1,min_periods=config.RSI_PERIOD).mean()
+        # avg_loss = loss.ewm(com = config.RSI_PERIOD-1,min_periods=config.RSI_PERIOD).mean()
+        # rs = abs(avg_gain / avg_loss)
+        # df["RSI"] = 100 - ( 100 / ( 1 + rs ))
+        df["RSI"] = ta.rsi(df['close'],config.RSI_PERIOD)
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -345,14 +404,14 @@ async def go_trade(exchange, symbol, limitTrade):
             count_trade = count_trade-1 if count_trade > 0 else 0
             await short_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Short Exit processing...")
-            notify.Send_Text(f'{symbol}\n สถานะ : Short Exit')
+            notify.Send_Text(f'{symbol}\nสถานะ : Short Exit')
             await cancel_order(exchange, symbol)
 
         elif config.Trade_Mode == 'on' and isBearishExit == True and hasLongPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await long_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Long Exit processing...")
-            notify.Send_Text(f'{symbol}\n สถานะ : Long Exit')
+            notify.Send_Text(f'{symbol}\nสถานะ : Long Exit')
             await cancel_order(exchange, symbol)
 
         if isBullish == True and config.Long == 'on' and hasLongPosition == False:
@@ -367,22 +426,24 @@ async def go_trade(exchange, symbol, limitTrade):
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify.Send_Text(f'{symbol}\n สถานะ : Long\nCross Up')
+                notify.Send_Text(f'{symbol}\nสถานะ : Long\nCross Up')
             
                 if config.TPSL_Mode =='on':
-                    pricetp = priceEntry + (priceEntry * (config.TP / 100.0))
-                    pricesl = priceEntry - (priceEntry * (config.SL / 100.0))
+                    pricetp = priceEntry + (priceEntry * (config.TP_Long / 100.0))
+                    pricesl = priceEntry - (priceEntry * (config.SL_Long / 100.0))
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\n สถานะ : Long set TPSL\nTP: {config.TP}%\nTP close: {config.TPclose}%\nSL: {config.SL}%')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TPSL\nTP: {config.TP_long}%\nTP close: {config.TPclose}%\nSL: {config.SL_Long}%')
                 if config.Trailing_Stop_Mode =='on':
                     pricetpTL = priceEntry +(priceEntry * (config.Active_TL / 100.0))
                     await long_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
                     print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                    notify.Send_Text(f'{symbol}\n สถานะ : Long set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
-            # else:
-            #     notify.Send_Text('Canot trade will sent alert only')
-            # Line(symbol,df)
+                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+
+                gather( line_chart(symbol,df) )
+                
+            elif config.Trade_Mode != 'on' :
+                gather( line_chart(symbol,df) )
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
             # print(symbol, 'isBearish')
@@ -396,22 +457,24 @@ async def go_trade(exchange, symbol, limitTrade):
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify.Send_Text(f'{symbol}\n สถานะ : Short\nCross Down')
+                notify.Send_Text(f'{symbol}\nสถานะ : Short\nCross Down')
             
                 if config.TPSL_Mode == 'on':
-                    pricetp = priceEntry - (priceEntry * (float(config.TP) / 100.0))
-                    pricesl = priceEntry + (priceEntry * (float(config.SL) / 100.0))
+                    pricetp = priceEntry - (priceEntry * (float(config.TP_Short) / 100.0))
+                    pricesl = priceEntry + (priceEntry * (float(config.SL_Short) / 100.0))
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\n สถานะ : Short set TPSL\nTP: {config.TP}%\nTP close: {config.TPclose}%\nSL: {config.SL}%')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TPSL\nTP: {config.TP_Short}%\nTP close: {config.TPclose}%\nSL: {config.SL_Short}%')
                 if config.Trailing_Stop_Mode == 'on':
                     pricetpTL = priceEntry - (priceEntry * (float(config.Active_TL) / 100.0))
                     await short_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
                     print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                    notify.Send_Text(f'{symbol}\n สถานะ : Short set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
-            # else:
-            #     notify.Send_Text('Canot trade will sent alert only')
-            # Line(symbol,df)
+                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+ 
+                gather( line_chart(symbol,df) )
+
+            elif config.Trade_Mode != 'on' :
+                gather( line_chart(symbol,df) )
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -551,6 +614,7 @@ async def waiting():
 
 if __name__ == "__main__":
     try:
+        pathlib.Path('./plots').mkdir(parents=True, exist_ok=True) 
         os.system("color") # enables ansi escape characters in terminal
         print(HIDE_CURSOR, end="")
         loop = get_event_loop()
