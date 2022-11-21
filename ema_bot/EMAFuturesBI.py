@@ -7,6 +7,8 @@ from LineNotify import LineNotify
 import config
 import os
 import pathlib
+import logging
+from logging.handlers import RotatingFileHandler
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -17,14 +19,16 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures Binance, version 1.3'
+bot_name = 'EMA Futures Binance, version 1.3.1'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
 CLS_LINE = '\033[0J'
 SHOW_CURSOR = '\033[?25h'
 HIDE_CURSOR = '\033[?25l'
+CRED  = '\33[31m'
 CGREEN  = '\33[32m'
+CYELLOW  = '\33[33m'
 CEND = '\033[0m'
 CBOLD = '\33[1m'
 
@@ -53,6 +57,13 @@ CANDLE_PLOT = 100
 # ----------------------------------------------------------------------------
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
+logger = logging.getLogger("App Log")
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler = RotatingFileHandler('app.log', backupCount=5)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 all_positions = pd.DataFrame(columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
 count_trade = 0
 
@@ -73,15 +84,15 @@ async def line_chart(symbol, df):
 
     colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
     added_plots = [
-        mpf.make_addplot(data['fast'],color='red'),
-        mpf.make_addplot(data['mid'],color='orange'),
-        mpf.make_addplot(data['slow'],color='green'),
-        mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue'),
-        mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.75),
-        mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.75),
-        mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.75),
+        mpf.make_addplot(data['fast'],color='red',width=0.5),
+        mpf.make_addplot(data['mid'],color='orange',width=0.5),
+        mpf.make_addplot(data['slow'],color='green',width=0.5),
+        mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue',width=0.75),
+        mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+        mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+        mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
         mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors),
-        mpf.make_addplot(data['MACDs'],panel=3,color='blue'),
+        mpf.make_addplot(data['MACDs'],panel=3,color='blue',width=0.75),
     ]
 
     filename = f"./plots/order_{symbol}.png"
@@ -249,61 +260,50 @@ async def set_leverage(exchange, symbol, marginType):
             # print(type(ex).__name__, str(ex))
             print(symbol, f'skip set leverage for {symbol}')
 
-async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0, **kwargs):
+async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
-    await gather(go_trade(exchange, symbol, kwargs['limitTrade']))
-
-async def update_all_balance(exchange, marginType):
-    global all_positions, balance_entry, count_trade
-
-    balance = await exchange.fetch_balance()
-    positions = balance['info']['positions']
-    all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
-        # columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
-        columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
-    count_trade = len(all_positions)
-    freeBalance =  await exchange.fetch_free_balance()
-    balance_entry = float(freeBalance[marginType])
-    profit_loss = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
-    if config.Trade_Mode == 'on':
-        # print("all_positions ================")
-        print(all_positions)
-        print("countTrade ===================", count_trade)
-        print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
+    gather( go_trade(exchange, symbol) )
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
     order = await exchange.create_market_buy_order(symbol, amount)
     # print("Status : LONG ENTERING PROCESSING...")
+    logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def long_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_sell_order(symbol, positionAmt, params={"reduceOnly":True})
+    logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def short_enter(exchange, symbol, amount):
     order = await exchange.create_market_sell_order(symbol, amount)
     # print("Status : SHORT ENTERING PROCESSING...")
+    logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def short_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_buy_order(symbol, (positionAmt*-1), params={"reduceOnly":True})
+    logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def cancel_order(exchange, symbol):
     order = await exchange.cancel_all_orders(symbol, params={'conditionalOrdersOnly':False})
+    logger.info(order)
     return 
 #-------------------------------------------------------------------------------
 async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
-    closetp=(config.TPclose/100)
+    closetp=(config.TPclose_Long/100)
     params = {
         'reduceOnly': True
     }
     params['stopPrice'] = pricetp
     order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'sell', (amount*closetp), PriceEntry, params)
+    logger.info(order)
     await sleep(1)
     params['stopPrice'] = pricesl
     order = await exchange.create_order(symbol, 'STOP_MARKET', 'sell', amount, PriceEntry, params)
+    logger.info(order)
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
@@ -311,24 +311,27 @@ async def long_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
     params = {
         # 'quantityIsRequired': False, 
         'activationPrice': pricetpTL, 
-        'callbackRate': config.Callback, 
+        'callbackRate': config.Callback_Long, 
         'reduceOnly': True
     }
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
+    logger.info(order)
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
-    closetp=(config.TPclose/100)
+    closetp=(config.TPclose_Short/100)
     params = {
         'quantityIsRequired': False, 
         'reduceOnly': True
     }
     params['stopPrice'] = pricetp
     order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'buy', (amount*closetp), PriceEntry, params)
+    logger.info(order)
     await sleep(1)
     params['stopPrice'] = pricesl
-    order = await exchange.create_order(symbol, 'STOP_MARKET', 'buy', amount, PriceEntry, params)                   
+    order = await exchange.create_order(symbol, 'STOP_MARKET', 'buy', amount, PriceEntry, params)        
+    logger.info(order)           
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
@@ -336,14 +339,34 @@ async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
     params = {
         'quantityIsRequired': False, 
         'activationPrice': pricetpTL, 
-        'callbackRate': config.Callback, 
+        'callbackRate': config.Callback_Short, 
         'reduceOnly': True
     }
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
+    logger.info(order)
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def go_trade(exchange, symbol, limitTrade):
+async def cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice):
+    # คำนวนจำนวนเหรียญที่ใช้เปิดออเดอร์
+    if chkLastPrice:
+        ticker = await exchange.fetch_ticker(symbol)
+        priceEntry = float(ticker['last'])
+    else:
+        priceEntry = float(closePrice)
+    if config.CostType=='#':
+        amount = config.CostAmount / priceEntry
+    elif config.CostType=='$':
+        amount = config.CostAmount * float(leverage) / priceEntry
+    elif config.CostType=='M':
+        minAmount = float(all_symbols[symbol][minAmount])
+        amount = priceEntry * minAmount / float(leverage)
+    else:
+        amount = (float(balance_entry)/100) * config.CostAmount * float(leverage) / priceEntry
+
+    return (priceEntry, amount)
+
+async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade
 
     # อ่านข้อมูลแท่งเทียนที่เก็บไว้ใน all_candles
@@ -359,6 +382,8 @@ async def go_trade(exchange, symbol, limitTrade):
         print(f'not found leverage for {symbol}')
         return
 
+    limitTrade = config.limit_Trade
+
     hasLongPosition = False
     hasShortPosition = False
     positionAmt = 0.0
@@ -366,15 +391,6 @@ async def go_trade(exchange, symbol, limitTrade):
     positionInfo = all_positions.loc[all_positions['symbol']==symbol]
 
     #market_info = pd.DataFrame(await exchange.fapiPrivate_get_positionrisk(), columns=["symbol", "entryPrice", "leverage" ,"unrealizedProfit", "isolatedWallet", "positionAmt"])
-
-    # คำนวนจำนวนเหรียญที่ใช้เปิดออเดอร์
-    priceEntry = float(df.iloc[-1]["close"])
-    if config.CostType=='#':
-        amount = config.CostAmount / priceEntry
-    elif config.CostType=='$':
-        amount = config.CostAmount * float(leverage) / priceEntry
-    else:
-        amount = (float(balance_entry)/100) * config.CostAmount * float(leverage) / priceEntry
 
     if not positionInfo.empty and positionInfo.iloc[-1]["positionAmt"] != 0:
         positionAmt = float(positionInfo.iloc[-1]["positionAmt"])
@@ -384,8 +400,8 @@ async def go_trade(exchange, symbol, limitTrade):
 
     # print(countTrade, positionAmt, hasLongPosition, hasShortPosition, amount)
 
-    if positionAmt == 0:
-        await cancel_order(exchange,symbol)
+    # if positionAmt == 0:
+    #     await cancel_order(exchange, symbol)
 
     try:
         signalIdx = config.SignalIndex
@@ -399,6 +415,8 @@ async def go_trade(exchange, symbol, limitTrade):
         isBearish = (fast[0] > slow[0] and fast[1] < slow[1])
         isBearishExit = (fast[0] > mid[0] and fast[1] < mid[1])
         # print(symbol, isBullish, isBearish, fast, slow)
+
+        closePrice = df.iloc[-1]["close"]
 
         if config.Trade_Mode == 'on' and isBullishExit == True and hasShortPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
@@ -417,8 +435,10 @@ async def go_trade(exchange, symbol, limitTrade):
         if isBullish == True and config.Long == 'on' and hasLongPosition == False:
             # print(symbol, 'isBullish')
             # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-            print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
+            # print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
+            print(f'{symbol:12} LONG')
             if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
@@ -433,23 +453,25 @@ async def go_trade(exchange, symbol, limitTrade):
                     pricesl = priceEntry - (priceEntry * (config.SL_Long / 100.0))
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TPSL\nTP: {config.TP_long}%\nTP close: {config.TPclose}%\nSL: {config.SL_Long}%')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TPSL\nTP: {config.TP_long}%\nTP close: {config.TPclose_Long}%\nSL: {config.SL_Long}%')
                 if config.Trailing_Stop_Mode =='on':
-                    pricetpTL = priceEntry +(priceEntry * (config.Active_TL / 100.0))
+                    pricetpTL = priceEntry +(priceEntry * (config.Active_TL_Long / 100.0))
                     await long_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
                     print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TrailingStop\nCall Back: {config.Callback_Long}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
 
                 gather( line_chart(symbol,df) )
                 
             elif config.Trade_Mode != 'on' :
-                gather( line_chart(symbol,df) )
+                gather( line_chart(f'{symbol}\nสถานะ : Long\nCross Up',df) )
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
             # print(symbol, 'isBearish')
             # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-            print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
+            # print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
+            print(f'{symbol:12} SHORT')
             if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
@@ -464,24 +486,176 @@ async def go_trade(exchange, symbol, limitTrade):
                     pricesl = priceEntry + (priceEntry * (float(config.SL_Short) / 100.0))
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TPSL\nTP: {config.TP_Short}%\nTP close: {config.TPclose}%\nSL: {config.SL_Short}%')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TPSL\nTP: {config.TP_Short}%\nTP close: {config.TPclose_Short}%\nSL: {config.SL_Short}%')
                 if config.Trailing_Stop_Mode == 'on':
-                    pricetpTL = priceEntry - (priceEntry * (float(config.Active_TL) / 100.0))
+                    pricetpTL = priceEntry - (priceEntry * (float(config.Active_TL_Short) / 100.0))
                     await short_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
                     print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TrailingStop\nCall Back: {config.Callback}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TrailingStop\nCall Back: {config.Callback_Short}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
  
                 gather( line_chart(symbol,df) )
 
             elif config.Trade_Mode != 'on' :
-                gather( line_chart(symbol,df) )
+                gather( line_chart(f'{symbol}\nสถานะ : Short\nCross Down',df) )
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
         pass
 
+async def load_all_symbols():
+    global all_symbols, watch_list
+    try:
+        exchange = ccxt.binance({
+            "apiKey": config.API_KEY,
+            "secret": config.API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True}
+        )
+
+        # t1=time.time()
+        markets = await exchange.fetch_markets()
+        # print(markets[0])
+        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits'])
+        mdf.drop(mdf[mdf.quote != config.MarginType].index, inplace=True)
+        mdf['minAmount'] = mdf['limits'].apply(lambda x: x['amount']['min'])
+        # print(mdf.columns)
+        # print(mdf.head())
+        drop_value = ['BTCUSDT_221230','ETHUSDT_221230']
+        all_symbols = {r['id']:{'symbol':r['symbol'],'minAmount':r['minAmount']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minAmount']].to_dict('records')}
+        # print(all_symbols, len(all_symbols))
+        # print(all_symbols.keys())
+        if len(config.watch_list) > 0:
+            watch_list_tmp = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
+        else:
+            watch_list_tmp = all_symbols.keys()
+        # remove sysbol if in back_list
+        watch_list = list(filter(lambda x: x not in config.back_list, watch_list_tmp))
+        # print(watch_list)
+        # t2=(time.time())-t1
+        # print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
+        
+        print(f'total     : {len(all_symbols.keys())} symbols')
+        print(f'target    : {len(watch_list)} symbols')
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
+
+    finally:
+        await exchange.close()
+
+async def set_all_leverage():
+    try:
+        exchange = ccxt.binance({
+            "apiKey": config.API_KEY,
+            "secret": config.API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True}
+        )
+
+        # set leverage
+        loops = [set_leverage(exchange, symbol, config.MarginType) for symbol in watch_list]
+        await gather(*loops)
+        # แสดงค่า leverage
+        # print(all_leverage)
+        print(f'#leverage : {len(all_leverage.keys())} symbols')
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
+
+    finally:
+        await exchange.close()
+
+async def fetch_first_ohlcv():
+    try:
+        exchange = ccxt.binance({
+            "apiKey": config.API_KEY,
+            "secret": config.API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True}
+        )
+
+        # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
+        limit = CANDLE_LIMIT
+
+        if TIMEFRAME_SECONDS[config.timeframe] >= TIMEFRAME_SECONDS['4h']:
+            # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
+            loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit) for symbol in watch_list]
+            await gather(*loops)
+        else:
+            # อ่านแท่งเทียนแบบ async แต่ ยังไม่เทรด
+            loops = [fetch_ohlcv(exchange, symbol, config.timeframe, limit) for symbol in watch_list]
+            await gather(*loops)
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
+
+    finally:
+        await exchange.close()
+
+async def fetch_next_ohlcv(next_ticker):
+    try:
+        exchange = ccxt.binance({
+            "apiKey": config.API_KEY,
+            "secret": config.API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True}
+        )
+
+        # กำหนด limit การอ่านแท่งเทียนแบบ 0=ไม่ระบุจำนวน, n=จำนวน n แท่ง
+        limit = 0
+
+        # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
+        loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit, next_ticker) for symbol in watch_list]
+        await gather(*loops)
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
+
+    finally:
+        await exchange.close()
+
+async def update_all_balance(marginType):
+    global all_positions, balance_entry, count_trade
+    try:
+        exchange = ccxt.binance({
+            "apiKey": config.API_KEY,
+            "secret": config.API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True}
+        )
+
+        balance = await exchange.fetch_balance()
+        positions = balance['info']['positions']
+        all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
+            # columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
+            columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
+        count_trade = len(all_positions)
+        freeBalance =  await exchange.fetch_free_balance()
+        balance_entry = float(freeBalance[marginType])
+        profit_loss = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
+        all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.2f}'.format(float(x)))
+        all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
+        all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
+        if config.Trade_Mode == 'on':
+            # print("all_positions ================")
+            print(all_positions)
+            print("countTrade ===================", count_trade)
+            print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
+
+    finally:
+        await exchange.close()
+
 async def main():
-    global all_symbols, watch_list, start_balance_entry
+    global start_balance_entry
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_name)
@@ -489,65 +663,29 @@ async def main():
     # แสดง status waiting ระหว่างที่รอ...
     gather(waiting())
 
-    exchange = ccxt.binance({
-        "apiKey": config.API_KEY,
-        "secret": config.API_SECRET,
-        "options": {"defaultType": "future"},
-        "enableRateLimit": True}
-    )
-    t1=time.time()
-    markets = await exchange.fetch_markets()
-    # print(markets[0])
-    mdf = pd.DataFrame(markets, columns=['id','quote','symbol'])
-    mdf.drop(mdf[mdf.quote != config.MarginType].index, inplace=True)
-    # print(mdf.columns)
-    # print(mdf.head())
-    drop_value = ['BTCUSDT_221230','ETHUSDT_221230']
-    all_symbols = {r['id'] : r['symbol'] for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol']].to_dict('records')}
-    # print(all_symbols)
-    if len(config.watch_list) > 0:
-        watch_list_tmp = list(filter(lambda x: x in all_symbols.keys(), config.watch_list))
-    else:
-        watch_list_tmp = all_symbols.keys()
-    # remove sysbol if in back_list
-    watch_list = list(filter(lambda x: x not in config.back_list, watch_list_tmp))
-    # print(watch_list)
-    t2=(time.time())-t1
-    # print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
-    print(f'total     : {len(all_symbols.keys())} symbols')
-    print(f'target    : {len(watch_list)} symbols')
+    await load_all_symbols()
 
-    kwargs = dict(
-        limitTrade=config.limit_Trade,
-    )
+    await set_all_leverage()
 
-    # set leverage
-    loops = [set_leverage(exchange, symbol, config.MarginType) for symbol in watch_list]
-    await gather(*loops)
-    # แสดงค่า leverage
-    # print(all_leverage)
-    print(f'#leverage : {len(all_leverage.keys())} symbols')
+    # kwargs = dict(
+    #     limitTrade=config.limit_Trade,
+    # )
 
     time_wait = TIMEFRAME_SECONDS[config.timeframe] # กำหนดเวลาต่อ 1 รอบ
     time_wait_1m = TIMEFRAME_SECONDS['1m'] # กำหนดเวลา update balance ทุก 1m
-
-    # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
-    limit = CANDLE_LIMIT
 
     # อ่านแท่งเทียนทุกเหรียญ
     t1=time.time()
     local_time = time.ctime(t1)
     print(f'get all candles: {local_time}')
 
-    # อ่านแท่งเทียนแบบ async แต่ ยังไม่เทรด
-    loops = [fetch_ohlcv(exchange, symbol, config.timeframe, limit) for symbol in watch_list]
-    await gather(*loops)
-    
+    await fetch_first_ohlcv()
+        
     t2=(time.time())-t1
     print(f'total time : {t2:0.2f} secs')
 
     # แสดงค่า positions & balance
-    await update_all_balance(exchange, config.MarginType)
+    await update_all_balance(config.MarginType)
     start_balance_entry = balance_entry
 
     try:
@@ -565,22 +703,17 @@ async def main():
                 local_time = time.ctime(seconds)
                 print(f'calculate new indicator: {local_time}')
                 
-                await update_all_balance(exchange, config.MarginType)
+                await update_all_balance(config.MarginType)
 
                 t1=time.time()
 
-                # กำหนด limit การอ่านแท่งเทียนแบบ 0=ไม่ระบุจำนวน, n=จำนวน n แท่ง
-                limit = 0
-
-                # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
-                loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit, next_ticker, **kwargs) for symbol in watch_list]
-                await gather(*loops)
-
-                next_ticker += time_wait # กำหนดรอบเวลาถัดไป
-                next_ticker_1m += time_wait_1m
+                await fetch_next_ohlcv(next_ticker)
 
                 t2=(time.time())-t1
                 print(f'total time : {t2:0.2f} secs')
+
+                next_ticker += time_wait # กำหนดรอบเวลาถัดไป
+                next_ticker_1m += time_wait_1m
 
                 await sleep(10)
 
@@ -589,7 +722,7 @@ async def main():
                 print(CLS_SCREEN+bot_name)
                 balance_time = time.ctime(seconds)
                 print(f'last indicator: {local_time}, last balance: {balance_time}')
-                await update_all_balance(exchange, config.MarginType)
+                await update_all_balance(config.MarginType)
                 next_ticker_1m += time_wait_1m
 
             await sleep(1)
@@ -599,9 +732,6 @@ async def main():
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-
-    finally:
-        await exchange.close()
 
 async def waiting():
     count = 0

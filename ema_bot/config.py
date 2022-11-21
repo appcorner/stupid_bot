@@ -1,9 +1,12 @@
 import configparser
 
+def is_exist(group, name):
+    return group in config.keys() and name in config[group].keys()
+
 def get_list(group, name, default=[]):
     value = default
     try:
-        if group in config.keys() and name in config[group].keys():
+        if is_exist(group, name):
             value = [x.strip() for x in config[group][name].split(',')]
         else:
             print(f'config {group}.{name} not found, set default to {default}')
@@ -15,7 +18,7 @@ def get_list(group, name, default=[]):
 def get_str(group, name, default=''):
     value = default
     try:
-        if group in config.keys() and name in config[group].keys():
+        if is_exist(group, name):
             value = config[group][name]
         else:
             print(f'config {group}.{name} not found, set default to {default}')
@@ -27,7 +30,7 @@ def get_str(group, name, default=''):
 def get_int(group, name, default=0):
     value = default
     try:
-        if group in config.keys() and name in config[group].keys():
+        if is_exist(group, name):
             value = int(config[group][name])
         else:
             print(f'config {group}.{name} not found, set default to {default}')
@@ -39,7 +42,7 @@ def get_int(group, name, default=0):
 def get_float(group, name, default=0.0):
     value = default
     try:
-        if group in config.keys() and name in config[group].keys():
+        if is_exist(group, name):
             value = float(config[group][name])
         else:
             print(f'config {group}.{name} not found, set default to {default}')
@@ -98,13 +101,36 @@ TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
 # TP = get_float('setting', 'tp_rate')
 TP_Long = get_float('setting', 'tp_long', 10.0)
 TP_Short = get_float('setting', 'tp_short', 10.0)
+
 TPclose = get_float('setting', 'tp_close', 50.0)
+TPclose_Long = TPclose
+TPclose_Short = TPclose
+if is_exist('setting', 'tp_close_long'):
+    TPclose_Long = get_float('setting', 'tp_close_long', 50.0)
+if is_exist('setting', 'tp_close_short'):
+    TPclose_Short = get_float('setting', 'tp_close_short', 50.0)
+
 # SL = get_float('setting', 'sl_rate')
 SL_Long = get_float('setting', 'sl_long', 4.0)
 SL_Short = get_float('setting', 'sl_short', 4.0)
+
 Trailing_Stop_Mode = get_str('setting', 'trailing_stop_mode', 'on')
+
 Callback = get_float('setting', 'callback', 5.0)
+Callback_Long = Callback
+Callback_Short = Callback
+if is_exist('setting', 'callback_long'):
+    Callback_Long = get_float('setting', 'callback_long', 5.0)
+if is_exist('setting', 'callback_short'):
+    Callback_Short = get_float('setting', 'callback_short', 5.0)
+
 Active_TL = get_float('setting', 'active_tl_rate', 10.0)
+Active_TL_Long = Active_TL
+Active_TL_Short = Active_TL
+if is_exist('setting', 'active_tl_long'):
+    Active_TL_Long = get_float('setting', 'active_tl_long', 10.0)
+if is_exist('setting', 'active_tl_short'):
+    Active_TL_Short = get_float('setting', 'active_tl_short', 10.0)
 
 Fast_Type = get_str('setting', 'fast_type')
 Fast_Value = get_int('setting', 'fast_value')

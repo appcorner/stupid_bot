@@ -4,6 +4,14 @@
 
 open futures order by cross signel between fast and slow indicator
 
+## v1.3.1
+- เปลี่ยนวิธีการเรียกใช้ exchange api
+- ปรับการแสดง position & balance
+- เพิ่มการเขียน log
+- แก้ last price ในการคำนวน amount เอาราคาล่าสุด
+- เพิ่มรูปแบบการคำนวน amount แบบ 'M' คำนวนจาก minAmount => amount = priceEntry * minAmount / leverage
+- กรณี TF >= 4h ให้เปิด trade ตามสัญญาน ณ.ตอนที่เปิดใช้งาน (กรณี TF ต่ำกว่า จะรอ trade รอบเวลาถัดไป)
+
 ## config.ini (rename จาก config.ini.sample)
 
     [binance]
@@ -30,6 +38,8 @@ open futures order by cross signel between fast and slow indicator
 
     auto_max_leverage = off
     leverage = 20
+    auto_min_cost = off
+    ; กำหนดรูปการคิด cost # $ % M
     cost_type = $
     cost_amount = 1.5
 
@@ -39,17 +49,18 @@ open futures order by cross signel between fast and slow indicator
     not_trade = 10.0
 
     tpsl_mode = on
-    ; เลิกใช้ tp_rate = 10
     tp_long = 10.0
     tp_short = 10.0
-    tp_close = 50.0
-    ; เลิกใช้ sl_rate = 4
+    tp_close_long = 50.0
+    tp_close_short = 50.0
     sl_long = 4.0
     sl_short = 4.0
 
     trailing_stop_mode = on
-    callback = 5.0
-    active_tl_rate = 10.0
+    callback_long = 5.0
+    callback_short = 5.0
+    active_tl_long = 10.0
+    active_tl_short = 10.0
 
     ; ระบุ type fast,slow => EMA, SMA, HMA, RMA, WMA, VWMA
     fast_type = EMA
