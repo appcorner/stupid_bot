@@ -11,6 +11,7 @@ open futures order by cross signel between fast and slow indicator
 - แก้ last price ในการคำนวน amount เอาราคาล่าสุด
 - เพิ่มรูปแบบการคำนวน amount แบบ 'M' คำนวนจาก minAmount => amount = priceEntry * minAmount / leverage
 - กรณี TF >= 4h ให้เปิด trade ตามสัญญาน ณ.ตอนที่เปิดใช้งาน (กรณี TF ต่ำกว่า จะรอ trade รอบเวลาถัดไป)
+- ปรับ config.ini แยก long short 
 
 ## config.ini (rename จาก config.ini.sample)
 
