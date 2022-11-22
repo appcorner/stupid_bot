@@ -58,9 +58,9 @@ CANDLE_PLOT = 100
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
 logger = logging.getLogger("App Log")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler = RotatingFileHandler('app.log', backupCount=5)
+handler = RotatingFileHandler('app.log', maxBytes=1000000, backupCount=5)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
@@ -79,7 +79,7 @@ RSI30 = [30 for i in range(0, CANDLE_PLOT)]
 RSI50 = [50 for i in range(0, CANDLE_PLOT)]
 RSI70 = [70 for i in range(0, CANDLE_PLOT)]
 
-async def line_chart(symbol, df):
+async def line_chart(symbol, df, msg=''):
     data = df.tail(CANDLE_PLOT)
 
     colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
@@ -109,8 +109,8 @@ async def line_chart(symbol, df):
         savefig=filename,
     )
 
-    notify.Send_Image(symbol, image_path=filename)
-    # await sleep(1)
+    notify.Send_Image(f'{symbol}{msg}', image_path=filename)
+    # await sleep(2)
     # os.remove(filename)
     return
 
@@ -262,7 +262,7 @@ async def set_leverage(exchange, symbol, marginType):
 
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
-    gather( go_trade(exchange, symbol) )
+    await gather( go_trade(exchange, symbol) )
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
@@ -349,21 +349,25 @@ async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
 #-------------------------------------------------------------------------------
 async def cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice):
     # คำนวนจำนวนเหรียญที่ใช้เปิดออเดอร์
+    priceEntry = float(closePrice)
+    # minAmount = float(all_symbols[symbol]['minAmount'])
+    minCost = float(all_symbols[symbol]['minCost'])
     if chkLastPrice:
-        ticker = await exchange.fetch_ticker(symbol)
-        priceEntry = float(ticker['last'])
-    else:
-        priceEntry = float(closePrice)
+        try:
+            ticker = await exchange.fetch_ticker(symbol)
+            priceEntry = float(ticker['last'])
+        except Exception as ex:
+            print(type(ex).__name__, str(ex))
     if config.CostType=='#':
         amount = config.CostAmount / priceEntry
     elif config.CostType=='$':
         amount = config.CostAmount * float(leverage) / priceEntry
-    elif config.CostType=='M':
-        minAmount = float(all_symbols[symbol][minAmount])
-        amount = priceEntry * minAmount / float(leverage)
+    # elif config.CostType=='M':
+    #     # amount = priceEntry * minAmount / float(leverage) * 1.1
+    #     amount =  minCost / float(leverage) / priceEntry * 1.1 
     else:
         amount = (float(balance_entry)/100) * config.CostAmount * float(leverage) / priceEntry
-
+    logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} min:{minCost} amt:{amount}')
     return (priceEntry, amount)
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
@@ -453,7 +457,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     pricesl = priceEntry - (priceEntry * (config.SL_Long / 100.0))
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TPSL\nTP: {config.TP_long}%\nTP close: {config.TPclose_Long}%\nSL: {config.SL_Long}%')
+                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TPSL\nTP: {config.TP_Long}%\nTP close: {config.TPclose_Long}%\nSL: {config.SL_Long}%')
                 if config.Trailing_Stop_Mode =='on':
                     pricetpTL = priceEntry +(priceEntry * (config.Active_TL_Long / 100.0))
                     await long_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
@@ -463,7 +467,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 gather( line_chart(symbol,df) )
                 
             elif config.Trade_Mode != 'on' :
-                gather( line_chart(f'{symbol}\nสถานะ : Long\nCross Up',df) )
+                gather( line_chart(symbol,df,'\nสถานะ : Long\nCross Up') )
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
             # print(symbol, 'isBearish')
@@ -496,7 +500,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 gather( line_chart(symbol,df) )
 
             elif config.Trade_Mode != 'on' :
-                gather( line_chart(f'{symbol}\nสถานะ : Short\nCross Down',df) )
+                gather( line_chart(symbol,df,'\nสถานะ : Short\nCross Down') )
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -518,11 +522,14 @@ async def load_all_symbols():
         # print(markets[0])
         mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits'])
         mdf.drop(mdf[mdf.quote != config.MarginType].index, inplace=True)
-        mdf['minAmount'] = mdf['limits'].apply(lambda x: x['amount']['min'])
+        # mdf.to_csv("fetch_markets.csv",index=False)
+        # mdf['minAmount'] = mdf['limits'].apply(lambda x: x['amount']['min'])
+        mdf['minCost'] = mdf['limits'].apply(lambda x: x['cost']['min'])
         # print(mdf.columns)
         # print(mdf.head())
         drop_value = ['BTCUSDT_221230','ETHUSDT_221230']
-        all_symbols = {r['id']:{'symbol':r['symbol'],'minAmount':r['minAmount']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minAmount']].to_dict('records')}
+        # all_symbols = {r['id']:{'symbol':r['symbol'],'minAmount':r['minAmount']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minAmount']].to_dict('records')}
+        all_symbols = {r['id']:{'symbol':r['symbol'],'minCost':r['minCost']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minCost']].to_dict('records')}
         # print(all_symbols, len(all_symbols))
         # print(all_symbols.keys())
         if len(config.watch_list) > 0:
@@ -537,6 +544,8 @@ async def load_all_symbols():
         
         print(f'total     : {len(all_symbols.keys())} symbols')
         print(f'target    : {len(watch_list)} symbols')
+
+        logger.info(f'all:{len(all_symbols.keys())} watch:{len(watch_list)}')
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -560,6 +569,8 @@ async def set_all_leverage():
         # แสดงค่า leverage
         # print(all_leverage)
         print(f'#leverage : {len(all_leverage.keys())} symbols')
+
+        logger.info(f'leverage:{len(all_leverage.keys())}')
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -647,6 +658,8 @@ async def update_all_balance(marginType):
             print("countTrade ===================", count_trade)
             print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
 
+        logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry}')
+
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.error(type(ex).__name__, str(ex))
@@ -683,6 +696,7 @@ async def main():
         
     t2=(time.time())-t1
     print(f'total time : {t2:0.2f} secs')
+    logger.info(f'first ohlcv: {t2:0.2f} secs')
 
     # แสดงค่า positions & balance
     await update_all_balance(config.MarginType)
@@ -711,6 +725,7 @@ async def main():
 
                 t2=(time.time())-t1
                 print(f'total time : {t2:0.2f} secs')
+                logger.info(f'update ohlcv: {t2:0.2f} secs (include trade)')
 
                 next_ticker += time_wait # กำหนดรอบเวลาถัดไป
                 next_ticker_1m += time_wait_1m
@@ -744,6 +759,7 @@ async def waiting():
 
 if __name__ == "__main__":
     try:
+        logger.info('start ==========')
         pathlib.Path('./plots').mkdir(parents=True, exist_ok=True) 
         os.system("color") # enables ansi escape characters in terminal
         print(HIDE_CURSOR, end="")

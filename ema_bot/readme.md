@@ -9,7 +9,7 @@ open futures order by cross signel between fast and slow indicator
 - ปรับการแสดง position & balance
 - เพิ่มการเขียน log
 - แก้ last price ในการคำนวน amount เอาราคาล่าสุด
-- เพิ่มรูปแบบการคำนวน amount แบบ 'M' คำนวนจาก minAmount => amount = priceEntry * minAmount / leverage
+- ~~เพิ่มรูปแบบการคำนวน amount แบบ 'M' คำนวนจาก minAmount => amount = priceEntry * minAmount / leverage~~
 - กรณี TF >= 4h ให้เปิด trade ตามสัญญาน ณ.ตอนที่เปิดใช้งาน (กรณี TF ต่ำกว่า จะรอ trade รอบเวลาถัดไป)
 - ปรับ config.ini แยก long short 
 
@@ -39,8 +39,7 @@ open futures order by cross signel between fast and slow indicator
 
     auto_max_leverage = off
     leverage = 20
-    auto_min_cost = off
-    ; กำหนดรูปการคิด cost # $ % M
+    ; กำหนดรูปการคิด cost # $ %
     cost_type = $
     cost_amount = 1.5
 
