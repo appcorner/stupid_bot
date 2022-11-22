@@ -143,3 +143,5 @@ MACD_FAST = get_int('setting', 'macd_fast')
 MACD_SLOW = get_int('setting', 'macd_slow')
 MACD_SIGNAL = get_int('setting', 'macd_signal')
 RSI_PERIOD = get_int('setting', 'rsi_period')
+
+CSV_NAME = get_str('symbols_setting', 'csv_name', None)

@@ -4,7 +4,7 @@
 
 open futures order by cross signel between fast and slow indicator
 
-## v1.3.1
+## v1.4
 - เปลี่ยนวิธีการเรียกใช้ exchange api
 - ปรับการแสดง position & balance
 - เพิ่มการเขียน log
@@ -12,6 +12,7 @@ open futures order by cross signel between fast and slow indicator
 - ~~เพิ่มรูปแบบการคำนวน amount แบบ 'M' คำนวนจาก minAmount => amount = priceEntry * minAmount / leverage~~
 - กรณี TF >= 4h ให้เปิด trade ตามสัญญาน ณ.ตอนที่เปิดใช้งาน (กรณี TF ต่ำกว่า จะรอ trade รอบเวลาถัดไป)
 - ปรับ config.ini แยก long short 
+- กำหนดค่า setting แยกตาม symbol 
 
 ## config.ini (rename จาก config.ini.sample)
 
@@ -76,3 +77,8 @@ open futures order by cross signel between fast and slow indicator
     macd_signal = 9
     ; สำหรับคำนวน rsi, default คือค่ามาตราฐาน
     rsi_period = 14
+
+    ; กำหนดค่า setting แยกตาม symbol
+    [symbols_setting]
+    ; ชื่อไฟล์ที่เก็บ setting ต้องเป็นไฟล์ csv
+    csv_name = symbol_config.csv

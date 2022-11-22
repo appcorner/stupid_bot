@@ -19,7 +19,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures Binance, version 1.3.1'
+bot_name = 'EMA Futures Binance, version 1.4'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -61,7 +61,7 @@ notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 logger = logging.getLogger("App Log")
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler = RotatingFileHandler('app.log', maxBytes=1000000, backupCount=5)
+handler = RotatingFileHandler('app.log', maxBytes=200000, backupCount=5)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
@@ -79,6 +79,37 @@ all_candles = {}
 RSI30 = [30 for i in range(0, CANDLE_PLOT)]
 RSI50 = [50 for i in range(0, CANDLE_PLOT)]
 RSI70 = [70 for i in range(0, CANDLE_PLOT)]
+
+CSV_COLUMNS = [
+        "symbol",
+        "signal_index",
+        "margin_type",
+        "trade_mode",
+        "trade_long",
+        "trade_short",
+        "leverage",
+        "cost_type",
+        "cost_amount",
+        "tpsl_mode",
+        "tp_long",
+        "tp_short",
+        "tp_close_long",
+        "tp_close_short",
+        "sl_long",
+        "sl_short",
+        "trailing_stop_mode",
+        "callback_long",
+        "callback_short",
+        "active_tl_long",
+        "active_tl_short",
+        "fast_type",
+        "fast_value",
+        "mid_type",
+        "mid_value",
+        "slow_type",
+        "slow_value"
+        ]
+symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
 
 async def line_chart(symbol, df, msg=''):
     data = df.tail(CANDLE_PLOT)
@@ -139,45 +170,60 @@ def add_indicator(symbol, bars):
     df['slow'] = 0
 
     try:
+        fastType = config.Fast_Type 
+        fastValue = config.Fast_Value
+        midType = config.Mid_Type 
+        midValue = config.Mid_Value        
+        slowType = config.Slow_Type 
+        slowValue = config.Slow_Value
 
-        if config.Fast_Type == 'EMA':
-            df['fast'] = ta.ema(df['close'],config.Fast_Value)
-        elif config.Fast_Type == 'SMA':
-            df['fast'] = ta.sma(df['close'],config.Fast_Value)
-        elif config.Fast_Type == 'HMA':
-            df['fast'] = ta.hma(df['close'],config.Fast_Value)
-        elif config.Fast_Type == 'RMA':
-            df['fast'] = ta.rma(df['close'],config.Fast_Value)
-        elif config.Fast_Type == 'WMA':
-            df['fast'] = ta.wma(df['close'],config.Fast_Value)
-        elif config.Fast_Type == 'VWMA':
-            df['fast'] = ta.vwma(df['close'],df['volume'],config.Fast_Value)
+        if symbol in symbols_setting.index:
+            # print(symbols_setting.loc[symbol])
+            fastType = symbols_setting.loc[symbol]['fast_type']
+            fastValue = int(symbols_setting.loc[symbol]['fast_value'])
+            midType = symbols_setting.loc[symbol]['mid_type']
+            midValue = int(symbols_setting.loc[symbol]['mid_value'])
+            slowType = symbols_setting.loc[symbol]['slow_type']
+            slowValue = int(symbols_setting.loc[symbol]['slow_value'])
 
-        if config.Mid_Type == 'EMA':
-            df['mid'] = ta.ema(df['close'],config.Mid_Value)
-        elif config.Mid_Type == 'SMA':
-            df['mid'] = ta.sma(df['close'],config.Mid_Value)
-        elif config.Mid_Type == 'HMA':
-            df['mid'] = ta.hma(df['close'],config.Mid_Value)
-        elif config.Mid_Type == 'RMA':
-            df['mid'] = ta.rma(df['close'],config.Mid_Value)
-        elif config.Mid_Type == 'WMA':
-            df['mid'] = ta.wma(df['close'],config.Mid_Value)
-        elif config.Mid_Type == 'VWMA':
-            df['mid'] = ta.vwma(df['close'],df['volume'],config.Mid_Value)
+        if fastType == 'EMA':
+            df['fast'] = ta.ema(df['close'],fastValue)
+        elif fastType == 'SMA':
+            df['fast'] = ta.sma(df['close'],fastValue)
+        elif fastType == 'HMA':
+            df['fast'] = ta.hma(df['close'],fastValue)
+        elif fastType == 'RMA':
+            df['fast'] = ta.rma(df['close'],fastValue)
+        elif fastType == 'WMA':
+            df['fast'] = ta.wma(df['close'],fastValue)
+        elif fastType == 'VWMA':
+            df['fast'] = ta.vwma(df['close'],df['volume'],fastValue)
 
-        if config.Slow_Type == 'EMA':
-            df['slow'] = ta.ema(df['close'],config.Slow_Value)
-        elif config.Slow_Type == 'SMA':
-            df['slow'] = ta.sma(df['close'],config.Slow_Value)
-        elif config.Slow_Type == 'HMA':
-            df['slow'] = ta.hma(df['close'],config.Slow_Value)
-        elif config.Slow_Type == 'RMA':
-            df['slow'] = ta.rma(df['close'],config.Slow_Value)
-        elif config.Slow_Type == 'WMA':
-            df['slow'] = ta.wma(df['close'],config.Slow_Value)
-        elif config.Slow_Type == 'VWMA':
-            df['slow'] = ta.vwma(df['close'],df['volume'],config.Slow_Value)
+        if midType == 'EMA':
+            df['mid'] = ta.ema(df['close'],midValue)
+        elif midType == 'SMA':
+            df['mid'] = ta.sma(df['close'],midValue)
+        elif midType == 'HMA':
+            df['mid'] = ta.hma(df['close'],midValue)
+        elif midType == 'RMA':
+            df['mid'] = ta.rma(df['close'],midValue)
+        elif midType == 'WMA':
+            df['mid'] = ta.wma(df['close'],midValue)
+        elif midType == 'VWMA':
+            df['mid'] = ta.vwma(df['close'],df['volume'],midValue)
+
+        if slowType == 'EMA':
+            df['slow'] = ta.ema(df['close'],slowValue)
+        elif slowType == 'SMA':
+            df['slow'] = ta.sma(df['close'],slowValue)
+        elif slowType == 'HMA':
+            df['slow'] = ta.hma(df['close'],slowValue)
+        elif slowType == 'RMA':
+            df['slow'] = ta.rma(df['close'],slowValue)
+        elif slowType == 'WMA':
+            df['slow'] = ta.wma(df['close'],slowValue)
+        elif slowType == 'VWMA':
+            df['slow'] = ta.vwma(df['close'],df['volume'],slowValue)
 
         # cal MACD
         ewm_fast     = df['close'].ewm(span=config.MACD_FAST, adjust=False).mean()
@@ -242,6 +288,8 @@ async def set_leverage(exchange, symbol, marginType):
             await exchange.set_leverage(leverage, symbol)
         else:
             leverage = config.Leverage
+            if symbol in symbols_setting.index:
+                leverage = int(symbols_setting.loc[symbol]['leverage'])
             await exchange.set_leverage(leverage, symbol)
 
         # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
@@ -289,12 +337,13 @@ async def short_close(exchange, symbol, positionAmt):
     return
 #-------------------------------------------------------------------------------
 async def cancel_order(exchange, symbol):
+    await sleep(1)
     order = await exchange.cancel_all_orders(symbol, params={'conditionalOrdersOnly':False})
     logger.info(order)
     return 
 #-------------------------------------------------------------------------------
-async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
-    closetp=(config.TPclose_Long/100)
+async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
+    closetp=(closeRate/100)
     params = {
         'reduceOnly': True
     }
@@ -308,11 +357,11 @@ async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def long_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
+async def long_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
     params = {
         # 'quantityIsRequired': False, 
-        'activationPrice': pricetpTL, 
-        'callbackRate': config.Callback_Long, 
+        'activationPrice': priceTL, 
+        'callbackRate': callbackRate, 
         'reduceOnly': True
     }
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
@@ -320,8 +369,8 @@ async def long_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
-    closetp=(config.TPclose_Short/100)
+async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
+    closetp=(closeRate/100)
     params = {
         'quantityIsRequired': False, 
         'reduceOnly': True
@@ -336,11 +385,11 @@ async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl):
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
+async def short_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
     params = {
         'quantityIsRequired': False, 
-        'activationPrice': pricetpTL, 
-        'callbackRate': config.Callback_Short, 
+        'activationPrice': priceTL, 
+        'callbackRate': callbackRate, 
         'reduceOnly': True
     }
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
@@ -348,27 +397,27 @@ async def short_TLSTOP(exchange, symbol, amount, PriceEntry, pricetpTL):
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice):
+async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice):
     # คำนวนจำนวนเหรียญที่ใช้เปิดออเดอร์
     priceEntry = float(closePrice)
     # minAmount = float(all_symbols[symbol]['minAmount'])
-    minCost = float(all_symbols[symbol]['minCost'])
+    # minCost = float(all_symbols[symbol]['minCost'])
     if chkLastPrice:
         try:
             ticker = await exchange.fetch_ticker(symbol)
             priceEntry = float(ticker['last'])
         except Exception as ex:
             print(type(ex).__name__, str(ex))
-    if config.CostType=='#':
-        amount = config.CostAmount / priceEntry
-    elif config.CostType=='$':
-        amount = config.CostAmount * float(leverage) / priceEntry
-    # elif config.CostType=='M':
+    if costType=='#':
+        amount = costAmount / priceEntry
+    elif costType=='$':
+        amount = costAmount * float(leverage) / priceEntry
+    # elif costType=='M':
     #     # amount = priceEntry * minAmount / float(leverage) * 1.1
     #     amount =  minCost / float(leverage) / priceEntry * 1.1 
     else:
-        amount = (float(balance_entry)/100) * config.CostAmount * float(leverage) / priceEntry
-    logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} min:{minCost} amt:{amount}')
+        amount = (float(balance_entry)/100) * costAmount * float(leverage) / priceEntry
+    logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} amt:{amount}')
     return (priceEntry, amount)
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
@@ -410,6 +459,19 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
     try:
         signalIdx = config.SignalIndex
+        tradeMode = config.Trade_Mode
+        TPSLMode = config.TPSL_Mode
+        trailingStopMode = config.Trailing_Stop_Mode
+        costType = config.CostType
+        costAmount = config.CostAmount
+        if symbol in symbols_setting.index:
+            signalIdx = int(symbols_setting.loc[symbol]['signal_index'])
+            tradeMode = symbols_setting.loc[symbol]['trade_mode']
+            TPSLMode = symbols_setting.loc[symbol]['tpsl_mode']
+            trailingStopMode = symbols_setting.loc[symbol]['trailing_stop_mode']
+            costType = symbols_setting.loc[symbol]['cost_type']
+            costAmount = float(symbols_setting.loc[symbol]['cost_amount'])
+
         fast = (df.iloc[signalIdx-1]['fast'], df.iloc[signalIdx]['fast'])
         mid = (df.iloc[signalIdx-1]['mid'], df.iloc[signalIdx]['mid'])
         slow = (df.iloc[signalIdx-1]['slow'], df.iloc[signalIdx]['slow'])
@@ -423,27 +485,42 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         closePrice = df.iloc[-1]["close"]
 
-        if config.Trade_Mode == 'on' and isBullishExit == True and hasShortPosition == True:
+        if tradeMode == 'on' and isBullishExit == True and hasShortPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await short_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Short Exit processing...")
             notify.Send_Text(f'{symbol}\nสถานะ : Short Exit')
             await cancel_order(exchange, symbol)
 
-        elif config.Trade_Mode == 'on' and isBearishExit == True and hasLongPosition == True:
+        elif tradeMode == 'on' and isBearishExit == True and hasLongPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await long_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Long Exit processing...")
             notify.Send_Text(f'{symbol}\nสถานะ : Long Exit')
             await cancel_order(exchange, symbol)
 
+        notify_msg = []
+        notify_msg.append(symbol)
+
         if isBullish == True and config.Long == 'on' and hasLongPosition == False:
+            TPLong = config.TP_Long
+            TPCloseLong = config.TPclose_Long
+            SLLong = config.SL_Long
+            callbackLong = config.Callback_Long
+            activeTLLong = config.Active_TL_Long
+            if symbol in symbols_setting.index:
+                TPLong = float(symbols_setting.loc[symbol]['tp_long'])
+                TPCloseLong = float(symbols_setting.loc[symbol]['tp_close_long'])
+                SLLong = float(symbols_setting.loc[symbol]['sl_long'])
+                callbackLong = float(symbols_setting.loc[symbol]['callback_long'])
+                activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
+
             # print(symbol, 'isBullish')
-            # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+            # print(symbol, tradeMode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
             # print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} LONG')
-            if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
-                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice)
+            if tradeMode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
@@ -451,32 +528,44 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify.Send_Text(f'{symbol}\nสถานะ : Long\nCross Up')
+                notify_msg.append('สถานะ : Long\nCross Up')
             
-                if config.TPSL_Mode =='on':
-                    pricetp = priceEntry + (priceEntry * (config.TP_Long / 100.0))
-                    pricesl = priceEntry - (priceEntry * (config.SL_Long / 100.0))
-                    await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
+                if TPSLMode =='on':
+                    pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
+                    pricesl = priceEntry - (priceEntry * (SLLong / 100.0))
+                    await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseLong)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TPSL\nTP: {config.TP_Long}%\nTP close: {config.TPclose_Long}%\nSL: {config.SL_Long}%')
-                if config.Trailing_Stop_Mode =='on':
-                    pricetpTL = priceEntry +(priceEntry * (config.Active_TL_Long / 100.0))
-                    await long_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
-                    print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Long set TrailingStop\nCall Back: {config.Callback_Long}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+                    notify_msg.append(f'สถานะ : Long set TPSL\nTP: {TPLong}%\nTP close: {TPCloseLong}%\nSL: {SLLong}%')
+                if trailingStopMode =='on':
+                    priceTL = priceEntry +(priceEntry * (activeTLLong / 100.0))
+                    await long_TLSTOP(exchange, symbol, amount, priceTL, callbackLong)
+                    print(f'[{symbol}] Set Trailing Stop {priceTL}')
+                    notify_msg.append(f'สถานะ : Long set TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
 
-                gather( line_chart(symbol,df) )
+                gather( line_chart(symbol, df, '\n'.join(notify_msg)) )
                 
-            elif config.Trade_Mode != 'on' :
-                gather( line_chart(symbol,df,'\nสถานะ : Long\nCross Up') )
+            elif tradeMode != 'on' :
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up') )
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
+            TPShort = config.TP_Short
+            TPCloseShort = config.TPclose_Short
+            SLShort = config.SL_Short
+            callbackShort = config.Callback_Short
+            activeTLShort = config.Active_TL_Short
+            if symbol in symbols_setting.index:
+                TPShort = float(symbols_setting.loc[symbol]['tp_short'])
+                TPCloseShort = float(symbols_setting.loc[symbol]['tp_close_short'])
+                SLShort = float(symbols_setting.loc[symbol]['sl_short'])
+                callbackShort = float(symbols_setting.loc[symbol]['callback_short'])
+                activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
+
             # print(symbol, 'isBearish')
-            # print(symbol, config.Trade_Mode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
+            # print(symbol, tradeMode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
             # print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} SHORT')
-            if config.Trade_Mode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
-                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, closePrice, chkLastPrice)
+            if tradeMode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
@@ -484,24 +573,24 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify.Send_Text(f'{symbol}\nสถานะ : Short\nCross Down')
+                notify_msg.append('สถานะ : Short\nCross Down')
             
-                if config.TPSL_Mode == 'on':
-                    pricetp = priceEntry - (priceEntry * (float(config.TP_Short) / 100.0))
-                    pricesl = priceEntry + (priceEntry * (float(config.SL_Short) / 100.0))
-                    await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl)
+                if TPSLMode == 'on':
+                    pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
+                    pricesl = priceEntry + (priceEntry * (SLShort / 100.0))
+                    await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseShort)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TPSL\nTP: {config.TP_Short}%\nTP close: {config.TPclose_Short}%\nSL: {config.SL_Short}%')
-                if config.Trailing_Stop_Mode == 'on':
-                    pricetpTL = priceEntry - (priceEntry * (float(config.Active_TL_Short) / 100.0))
-                    await short_TLSTOP(exchange, symbol, amount, priceEntry, pricetpTL)
-                    print(f'[{symbol}] Set Trailing Stop {pricetpTL}')
-                    notify.Send_Text(f'{symbol}\nสถานะ : Short set TrailingStop\nCall Back: {config.Callback_Short}%\nActive Price: {round(pricetpTL,5)} {config.MarginType}')
+                    notify_msg.append(f'สถานะ : Short set TPSL\nTP: {TPShort}%\nTP close: {TPCloseShort}%\nSL: {SLShort}%')
+                if trailingStopMode == 'on':
+                    priceTL = priceEntry - (priceEntry * (activeTLShort / 100.0))
+                    await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
+                    print(f'[{symbol}] Set Trailing Stop {priceTL}')
+                    notify_msg.append(f'สถานะ : Short set TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
  
-                gather( line_chart(symbol,df) )
+                gather( line_chart(symbol, df, '\n'.join(notify_msg)) )
 
-            elif config.Trade_Mode != 'on' :
-                gather( line_chart(symbol,df,'\nสถานะ : Short\nCross Down') )
+            elif tradeMode != 'on' :
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down') )
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -656,7 +745,7 @@ async def update_all_balance(marginType):
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
-            print("countTrade ===================", count_trade)
+            print("countTrade ===================", f'{count_trade}/{config.limit_Trade}')
             print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
 
         logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry}')
@@ -667,6 +756,46 @@ async def update_all_balance(marginType):
 
     finally:
         await exchange.close()
+
+async def load_symbols_setting():
+    global symbols_setting
+    try:
+        if config.CSV_NAME:
+            symbols_setting = pd.read_csv(config.CSV_NAME, skipinitialspace=True)
+            if any(x in CSV_COLUMNS for x in symbols_setting.columns.to_list()):
+                symbols_setting.drop(symbols_setting[symbols_setting.margin_type != config.MarginType].index, inplace=True)
+                symbols_setting['id'] = symbols_setting['symbol']+symbols_setting['margin_type']
+                symbols_setting.set_index('id', inplace=True)
+                # เอาอันซ้ำออก เหลืออันใหม่สุด
+                symbols_setting = symbols_setting[~symbols_setting.index.duplicated(keep='last')]
+
+                # validate all values
+                int_columns = [
+                        'fast_value', 'mid_value', 'slow_value', 'signal_index', 'leverage'
+                        ]
+                float_columns = [
+                        'cost_amount', 
+                        'tp_long', 'tp_close_long', 'sl_long', 'callback_long', 'active_tl_long',
+                        'tp_short', 'tp_close_short', 'sl_short', 'callback_short', 'active_tl_short'
+                        ]
+                symbols_setting[int_columns] = symbols_setting[int_columns].apply(pd.to_numeric, errors='coerce')
+                symbols_setting[float_columns] = symbols_setting[float_columns].apply(pd.to_numeric, downcast='float', errors='coerce')
+                symbols_setting.dropna(inplace=True)
+
+                # print(symbols_setting.head())
+                # print(symbols_setting.iloc[1])
+                # validate all setting
+
+                logger.info(f'success load symbols_setting from {config.CSV_NAME}')
+            else:
+                symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
+                print(f'fail load symbols_setting from {config.CSV_NAME}, all columns not match')
+                logger.info(f'fail load symbols_setting from {config.CSV_NAME}, all columns not match')
+
+    except Exception as ex:
+        symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
+        print(type(ex).__name__, str(ex))
+        logger.error(type(ex).__name__, str(ex))
 
 async def main():
     global start_balance_entry
@@ -680,6 +809,8 @@ async def main():
     await load_all_symbols()
 
     await set_all_leverage()
+
+    await load_symbols_setting()
 
     # kwargs = dict(
     #     limitTrade=config.limit_Trade,
