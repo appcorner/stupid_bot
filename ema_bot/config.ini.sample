@@ -52,4 +52,4 @@ macd_signal = 9
 rsi_period = 14
 
 [symbols_setting]
-csv_name = symbol_config.csv
+; csv_name = symbol_config.csv

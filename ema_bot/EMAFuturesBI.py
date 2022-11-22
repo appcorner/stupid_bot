@@ -19,7 +19,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures Binance, version 1.4'
+bot_name = 'EMA Futures (Binance) version 1.4'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -111,7 +111,7 @@ CSV_COLUMNS = [
         ]
 symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
 
-async def line_chart(symbol, df, msg=''):
+async def line_chart(symbol, df, msg):
     data = df.tail(CANDLE_PLOT)
 
     colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
@@ -141,7 +141,7 @@ async def line_chart(symbol, df, msg=''):
         savefig=filename,
     )
 
-    notify.Send_Image(f'{symbol}{msg}', image_path=filename)
+    notify.Send_Image(msg, image_path=filename)
     # await sleep(2)
     # os.remove(filename)
     return
