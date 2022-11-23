@@ -1,0 +1,56 @@
+[binance]
+api_key = <binance api key>
+api_secret = <binance app secret>
+
+[line]
+notify_token = <line notify token>
+
+[setting]
+timeframe = 15m
+signal_index = -1
+margin_type = USDT
+
+; watch_list = BTCUSDT,DOGEUSDT,GALUSDT,GALAUSDT,IOSTUSDT,MANAUSDT,NEARUSDT,OCEANUSDT,XLMUSDT,XRPUSDT
+; back_list = SRMUSDT,SOLUSDT,SFPUSDT,FTTUSDT
+
+trade_mode = on
+trade_long = on
+trade_short = on
+
+auto_max_leverage = off
+leverage = 20
+auto_min_cost = off
+cost_type = $
+cost_amount = 1.5
+
+limit_trade = 10
+not_trade = 10.0
+
+tpsl_mode = on
+tp_long = 10.0
+tp_short = 10.0
+tp_close_long = 50.0
+tp_close_short = 50.0
+sl_long = 4.0
+sl_short = 4.0
+
+trailing_stop_mode = on
+callback_long = 5.0
+callback_short = 5.0
+active_tl_long = 10.0
+active_tl_short = 10.0
+
+adx_period = 14
+adx_in = 25
+position_ob = 70
+position_os = 30
+exit_ob = 50
+exit_os = 50
+
+macd_fast = 12
+macd_slow = 26
+macd_signal = 9
+rsi_period = 14
+
+[symbols_setting]
+; csv_name = symbol_config.csv

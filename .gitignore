@@ -129,4 +129,7 @@ dmypy.json
 .pyre/
 binance_bot/config.ini
 ema_bot/config.ini
+ema_bot/plots/
+adxrsi_bot/config.ini
+adxrsi_bot/plots/
 *.ini

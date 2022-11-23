@@ -1,0 +1,7 @@
+symbol,margin_type,signal_index,trade_mode,trade_long,trade_short,leverage,cost_type,cost_amount,tpsl_mode,tp_long,tp_short,tp_close_long,tp_close_short,sl_long,sl_short,trailing_stop_mode,callback_long,callback_short,active_tl_long,active_tl_short,adx_period,adx_in,position_ob,position_os,exit_ob,exit_os
+BTC,USDT,-1,on,on,on,20,$,1.5,on,10,10,50,50,4,4,on,5,5,10,10,14,25,70,30,50,50
+DOGE,USDT,-1,on,on,on,25,$,1.5,on,10,10,50,50,4,4,on,5,5,10,10,14,25,70,30,50,50
+GAL,USDT,-1,on,on,on,25,$,1.5,on,10,10,50,50,4,4,on,5,5,10,10,14,25,70,30,50,50
+IOST,USDT,-1,on,on,on,20,$,1.5,on,10,10,50,50,4,4,on,5,5,10,10,14,25,70,30,50,50
+MANA,USDT,-1,on,on,on,20,$,1.5,on,10,10,50,50,4,4,on,5,5,10,10,14,25,70,30,50,50
+MKR,USDT,-1,on,on,on,20,$,1.5,on,10,10,50,50,4,4,on,5,5,10,10,14,25,70,30,50,50
