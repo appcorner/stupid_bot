@@ -19,7 +19,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4'
+bot_name = 'EMA Futures (Binance) version 1.4.1'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -81,27 +81,16 @@ RSI50 = [50 for i in range(0, CANDLE_PLOT)]
 RSI70 = [70 for i in range(0, CANDLE_PLOT)]
 
 CSV_COLUMNS = [
-        "symbol",
-        "signal_index",
-        "margin_type",
-        "trade_mode",
-        "trade_long",
-        "trade_short",
-        "leverage",
-        "cost_type",
-        "cost_amount",
+        "symbol", "signal_index", "margin_type",
+        "trade_mode", "trade_long", "trade_short",
+        "leverage", "cost_type", "cost_amount",
         "tpsl_mode",
-        "tp_long",
-        "tp_short",
-        "tp_close_long",
-        "tp_close_short",
-        "sl_long",
-        "sl_short",
+        "tp_long", "tp_short",
+        "tp_close_long", "tp_close_short",
+        "sl_long", "sl_short",
         "trailing_stop_mode",
-        "callback_long",
-        "callback_short",
-        "active_tl_long",
-        "active_tl_short",
+        "callback_long", "callback_short",
+        "active_tl_long", "active_tl_short",
         "fast_type",
         "fast_value",
         "mid_type",
@@ -244,6 +233,7 @@ def add_indicator(symbol, bars):
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
+        logger.exception('add_indicator')
 
     return df
 
@@ -274,13 +264,14 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             # print(symbol)
     except Exception as ex:
         print(type(ex).__name__, str(ex))
+        logger.exception('fetch_ohlcv')
         if limit == 0 and symbol in all_candles.keys():
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
 
 async def set_leverage(exchange, symbol, marginType):
     try:
         if config.automaxLeverage == "on":
-            symbol_ccxt = all_symbols[symbol]
+            symbol_ccxt = all_symbols[symbol]['symbol']
             params  = {"settle": marginType}
             lv_tiers = await exchange.fetchLeverageTiers([symbol], params=params)
             leverage = int(lv_tiers[symbol_ccxt][0]['maxLeverage'])
@@ -295,11 +286,12 @@ async def set_leverage(exchange, symbol, marginType):
         # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
         all_leverage[symbol] = leverage
     except Exception as ex:
-        # print(type(ex).__name__, str(ex))
+        logger.debug(f'{symbol} {type(ex).__name__} {str(ex)}')
         leverage = 5
         if type(ex).__name__ == 'ExchangeError' and '-4300' in str(ex):
             leverage = 20
-        print(symbol, f'found leverage error, bot will set leverage = {leverage}')
+        print(symbol, f'found leverage error, Bot will set leverage = {leverage}')
+        logger.info(f'{symbol} found leverage error, Bot will set leverage = {leverage}')
 
         # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
         all_leverage[symbol] = leverage
@@ -307,7 +299,8 @@ async def set_leverage(exchange, symbol, marginType):
             await exchange.set_leverage(leverage, symbol)
         except Exception as ex:
             # print(type(ex).__name__, str(ex))
-            print(symbol, f'skip set leverage for {symbol}')
+            print(symbol, f'can not set leverage')
+            logger.info(f'{symbol} can not set leverage')
 
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
@@ -417,7 +410,9 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
     #     amount =  minCost / float(leverage) / priceEntry * 1.1 
     else:
         amount = (float(balance_entry)/100) * costAmount * float(leverage) / priceEntry
+
     logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} amt:{amount}')
+
     return (priceEntry, amount)
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
@@ -594,7 +589,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('go_trade')
         pass
 
 async def load_all_symbols():
@@ -639,7 +634,7 @@ async def load_all_symbols():
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('load_all_symbols')
 
     finally:
         await exchange.close()
@@ -664,7 +659,7 @@ async def set_all_leverage():
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('set_all_leverage')
 
     finally:
         await exchange.close()
@@ -692,7 +687,7 @@ async def fetch_first_ohlcv():
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('set_all_leverage')
 
     finally:
         await exchange.close()
@@ -715,7 +710,7 @@ async def fetch_next_ohlcv(next_ticker):
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('fetch_next_ohlcv')
 
     finally:
         await exchange.close()
@@ -752,7 +747,7 @@ async def update_all_balance(marginType):
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('update_all_balance')
 
     finally:
         await exchange.close()
@@ -795,7 +790,7 @@ async def load_symbols_setting():
     except Exception as ex:
         symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
         print(type(ex).__name__, str(ex))
-        logger.error(type(ex).__name__, str(ex))
+        logger.exception('load_symbols_setting')
 
 async def main():
     global start_balance_entry
@@ -808,9 +803,9 @@ async def main():
 
     await load_all_symbols()
 
-    await set_all_leverage()
-
     await load_symbols_setting()
+
+    await set_all_leverage()
 
     # kwargs = dict(
     #     limitTrade=config.limit_Trade,
@@ -879,6 +874,7 @@ async def main():
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
+        logger.exception('main')
 
 async def waiting():
     count = 0
@@ -903,6 +899,7 @@ if __name__ == "__main__":
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
+        logger.exception('app')
 
     finally:
         print(SHOW_CURSOR, end="")

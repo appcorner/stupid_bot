@@ -2,7 +2,10 @@
 
 ## ema_bot (ema fast slow, cross strategy)
 
-open futures order by cross signel between fast and slow indicator
+open futures order by cross signal between fast and slow indicator
+
+## v1.4.1
+- fix bug: ปัญหาการ set_leverage, ลำดับการทำงานการอ่าน multiple setting ต้องทำก่อนการ set_leverage
 
 ## v1.4
 - เปลี่ยนวิธีการเรียกใช้ exchange api
@@ -82,3 +85,7 @@ open futures order by cross signel between fast and slow indicator
     [symbols_setting]
     ; ชื่อไฟล์ที่เก็บ setting ต้องเป็นไฟล์ csv
     csv_name = symbol_config.csv
+
+## donate
+- ETH: 0xeAfe7f1Db46E2c007b60174EB4527ab38bd54B54
+- DOGE: DCkpCgt1HUVhCsvJVW7YA4E4NkxMsLHPz8
