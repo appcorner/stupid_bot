@@ -103,7 +103,7 @@ CSV_COLUMNS = [
         ]
 symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
 
-async def line_chart(symbol, df, msg):
+async def line_chart(symbol, df, msg, pd=''):
     data = df.tail(CANDLE_PLOT)
 
     colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
@@ -126,7 +126,7 @@ async def line_chart(symbol, df, msg):
         figratio=(8, 6),
         panel_ratios=(8,2,2,2),
         type="candle",
-        title=f'{symbol} ({config.timeframe} @ {data.index[-1]})',
+        title=f'{symbol} {pd} ({config.timeframe} @ {data.index[-1]})',
         addplot=added_plots,
         tight_layout=True,
         style="yahoo",
@@ -562,17 +562,17 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     pricesl = priceEntry - (priceEntry * (SLLong / 100.0))
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseLong)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify_msg.append(f'สถานะ : Long set TPSL\nTP: {TPLong}%\nTP close: {TPCloseLong}%\nSL: {SLLong}%')
+                    notify_msg.append(f'# TPSL\nTP: {TPLong}%\nTP close: {TPCloseLong}%\nSL: {SLLong}%')
                 if trailingStopMode =='on':
                     priceTL = priceEntry +(priceEntry * (activeTLLong / 100.0))
                     await long_TLSTOP(exchange, symbol, amount, priceTL, callbackLong)
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
-                    notify_msg.append(f'สถานะ : Long set TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
 
-                gather( line_chart(symbol, df, '\n'.join(notify_msg)) )
+                gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'LONG')
                 
             elif tradeMode != 'on' :
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up') )
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up'), 'LONG')
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
             TPShort = config.TP_Short
@@ -607,17 +607,17 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     pricesl = priceEntry + (priceEntry * (SLShort / 100.0))
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseShort)
                     print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify_msg.append(f'สถานะ : Short set TPSL\nTP: {TPShort}%\nTP close: {TPCloseShort}%\nSL: {SLShort}%')
+                    notify_msg.append(f'# TPSL\nTP: {TPShort}%\nTP close: {TPCloseShort}%\nSL: {SLShort}%')
                 if trailingStopMode == 'on':
                     priceTL = priceEntry - (priceEntry * (activeTLShort / 100.0))
                     await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
-                    notify_msg.append(f'สถานะ : Short set TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
  
-                gather( line_chart(symbol, df, '\n'.join(notify_msg)) )
+                gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'SHORT')
 
             elif tradeMode != 'on' :
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down') )
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down'), 'SHORT')
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
