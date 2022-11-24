@@ -64,15 +64,17 @@ API_KEY = get_str('binance','api_key')
 API_SECRET = get_str('binance','api_secret')
 
 #------------------------------------------------------------
-# bitkub
-#------------------------------------------------------------
-# BK_API_KEY = get_str('bitkub','api_key')
-# BK_API_SECRET = get_str('bitkub','api_secret')
-
-#------------------------------------------------------------
 # line
 #------------------------------------------------------------
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
+
+#------------------------------------------------------------
+# app_config
+#------------------------------------------------------------
+TIME_SHIFT = get_int('app_config', 'TIME_SHIFT', 10)
+CANDLE_LIMIT = get_int('app_config', 'CANDLE_LIMIT', 1000)
+CANDLE_PLOT = get_int('app_config', 'CANDLE_PLOT', 100)
+LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
 
 #------------------------------------------------------------
 # setting

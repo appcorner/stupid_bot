@@ -19,7 +19,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4.1'
+bot_name = 'EMA Futures (Binance) version 1.4.2'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -33,7 +33,7 @@ CEND = '\033[0m'
 CBOLD = '\33[1m'
 
 # กำหนดเวลาที่ต้องการเลื่อนการอ่านข้อมูล เป็นจำนวนวินาที
-TIME_SHIFT = 5
+TIME_SHIFT = config.TIME_SHIFT
 
 TIMEFRAME_SECONDS = {
     '1m': 60,
@@ -50,8 +50,8 @@ TIMEFRAME_SECONDS = {
     '1d': 60*60*24,
 }
 
-CANDLE_LIMIT = 1000
-CANDLE_PLOT = 100
+CANDLE_LIMIT = config.CANDLE_LIMIT
+CANDLE_PLOT = config.CANDLE_PLOT
 
 # ----------------------------------------------------------------------------
 # global variable
@@ -59,7 +59,7 @@ CANDLE_PLOT = 100
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
 logger = logging.getLogger("App Log")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(config.LOG_LEVEL)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler = RotatingFileHandler('app.log', maxBytes=200000, backupCount=5)
 handler.setFormatter(formatter)
@@ -75,6 +75,9 @@ watch_list = {}
 all_symbols = {}
 all_leverage = {}
 all_candles = {}
+
+order_detail = {'position':'', 'win':0, 'loss':0, 'check_candle':False}
+orders_history = {}
 
 RSI30 = [30 for i in range(0, CANDLE_PLOT)]
 RSI50 = [50 for i in range(0, CANDLE_PLOT)]
@@ -136,6 +139,7 @@ async def line_chart(symbol, df, msg):
     return
 
 def add_indicator(symbol, bars):
+    global orders_history
     df = pd.DataFrame(
         bars, columns=["timestamp", "open", "high", "low", "close", "volume"]
     )
@@ -147,6 +151,11 @@ def add_indicator(symbol, bars):
     # เอาข้อมูลใหม่ไปต่อท้าย ข้อมูลที่มีอยู่
     if symbol in all_candles.keys() and len(df) < CANDLE_LIMIT:
         df = pd.concat([all_candles[symbol], df], ignore_index=False)
+        if symbol == f'BTC{config.MarginType}' or (symbol in orders_history.keys() and orders_history[symbol]['check_candle'] == False):
+            logger.debug(symbol)
+            logger.debug(f'\n{df.tail(10)}')
+            if symbol in orders_history.keys():
+                orders_history[symbol]['check_candle'] == True
 
         # เอาแท่งซ้ำออก เหลืออันใหม่สุด
         df = df[~df.index.duplicated(keep='last')].tail(CANDLE_LIMIT)
@@ -157,6 +166,10 @@ def add_indicator(symbol, bars):
     df['fast'] = 0
     df['mid'] = 0
     df['slow'] = 0
+    df['MACD'] = 0
+    df['MACDs'] = 0
+    df['MACDh'] = 0
+    df["RSI"] = 0
 
     try:
         fastType = config.Fast_Type 
@@ -305,27 +318,46 @@ async def set_leverage(exchange, symbol, marginType):
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
     await gather( go_trade(exchange, symbol) )
-
+# order management zone --------------------------------------------------------
+async def add_order_history(symbol):
+    global orders_history
+    if symbol in orders_history.keys():
+        orders_history[symbol]['check_candle'] = False
+    else:
+        orders_history[symbol] = order_detail
+async def upd_order_history(symbol):
+    global orders_history
+    if symbol in orders_history.keys():
+        positionInfo = all_positions.loc[all_positions['symbol']==symbol]
+        profit = float(positionInfo.iloc[-1]["unrealizedProfit"])
+        if profit > 0:
+            orders_history[symbol]['win'] = orders_history[symbol]['win']+1
+        else:
+            orders_history[symbol]['loss'] = orders_history[symbol]['loss']+1
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
     order = await exchange.create_market_buy_order(symbol, amount)
+    await add_order_history(symbol)
     # print("Status : LONG ENTERING PROCESSING...")
     logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def long_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_sell_order(symbol, positionAmt, params={"reduceOnly":True})
+    await upd_order_history(symbol)
     logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def short_enter(exchange, symbol, amount):
     order = await exchange.create_market_sell_order(symbol, amount)
+    await add_order_history(symbol)
     # print("Status : SHORT ENTERING PROCESSING...")
     logger.info(order)
     return
 #-------------------------------------------------------------------------------
 async def short_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_buy_order(symbol, (positionAmt*-1), params={"reduceOnly":True})
+    await upd_order_history(symbol)
     logger.info(order)
     return
 #-------------------------------------------------------------------------------
@@ -515,11 +547,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             # print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} LONG')
             if tradeMode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                count_trade = count_trade + 1
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
-                count_trade += 1
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
@@ -560,11 +592,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             # print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} SHORT')
             if tradeMode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                count_trade = count_trade + 1
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
-                count_trade += 1
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
@@ -730,20 +762,28 @@ async def update_all_balance(marginType):
         all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
             # columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
             columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
-        count_trade = len(all_positions)
+        my_positions = all_positions[all_positions['symbol'].str.endswith(marginType)]
+        count_trade = len(my_positions)
         freeBalance =  await exchange.fetch_free_balance()
         balance_entry = float(freeBalance[marginType])
-        profit_loss = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
+        sumProfit = pd.Series(my_positions['unrealizedProfit'].apply(lambda x: float(x))).sum()
+        sumMargin = pd.Series(my_positions['initialMargin'].apply(lambda x: float(x))).sum()
+        balance_change = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.2f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
         all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
-            print("countTrade ===================", f'{count_trade}/{config.limit_Trade}')
-            print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
-
-        logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry}')
+            print("Count Trade =====", f'{count_trade}/{config.limit_Trade} {marginType}')
+            print("Balance Entry === {:,.4f}".format(balance_entry), 
+                "change: {:+,.4f}".format(balance_change),
+                "margit: {:+,.4f}".format(sumMargin),
+                "profit: {:+,.4f}".format(sumProfit)
+                )
+            print("Total Balance === {:,.4f}".format(balance_entry+sumMargin+sumProfit))
+                
+        logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -795,8 +835,10 @@ async def load_symbols_setting():
 async def main():
     global start_balance_entry
 
+    bot_title = f'{bot_name} - {config.timeframe}'
+
     # set cursor At top, left (1,1)
-    print(CLS_SCREEN+bot_name)
+    print(CLS_SCREEN+bot_title)
 
     # แสดง status waiting ระหว่างที่รอ...
     gather(waiting())
@@ -839,7 +881,7 @@ async def main():
             seconds = time.time()
             if seconds >= next_ticker + TIME_SHIFT: # ครบรอบ
                 # set cursor At top, left (1,1)
-                print(CLS_SCREEN+bot_name)
+                print(CLS_SCREEN+bot_title)
 
                 local_time = time.ctime(seconds)
                 print(f'calculate new indicator: {local_time}')
@@ -861,7 +903,7 @@ async def main():
 
             elif config.Trade_Mode == 'on' and seconds >= next_ticker_1m + TIME_SHIFT:
                 # set cursor At top, left (1,1)
-                print(CLS_SCREEN+bot_name)
+                print(CLS_SCREEN+bot_title)
                 balance_time = time.ctime(seconds)
                 print(f'last indicator: {local_time}, last balance: {balance_time}')
                 await update_all_balance(config.MarginType)
