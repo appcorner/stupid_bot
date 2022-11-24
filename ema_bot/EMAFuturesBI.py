@@ -151,9 +151,8 @@ def add_indicator(symbol, bars):
     # เอาข้อมูลใหม่ไปต่อท้าย ข้อมูลที่มีอยู่
     if symbol in all_candles.keys() and len(df) < CANDLE_LIMIT:
         df = pd.concat([all_candles[symbol], df], ignore_index=False)
-        if symbol == f'BTC{config.MarginType}' or (symbol in orders_history.keys() and orders_history[symbol]['check_candle'] == False):
-            logger.debug(symbol)
-            logger.debug(f'\n{df.tail(10)}')
+        if symbol in orders_history.keys() and orders_history[symbol]['check_candle'] == False:
+            logger.debug(f'{symbol}\n{df.tail(5)}')
             if symbol in orders_history.keys():
                 orders_history[symbol]['check_candle'] == True
 
@@ -267,7 +266,7 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             # if symbol == "BTCUSDT":
             #     print('----->', timestamp, last_candle_time, timestamp-last_candle_time, (timestamp-last_candle_time)/timeframe_secs)
             # ให้อ่านแท่งสำรองเพิ่มอีก 2 แท่ง
-            ohlcv_bars = await exchange.fetch_ohlcv(symbol, timeframe, None, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
+            ohlcv_bars = await exchange.fetch_ohlcv(symbol, timeframe, None, round(1.5+(timestamp-last_candle_time)/timeframe_secs))
             # if symbol == "BTCUSDT":
             #     print('----->', f'จำนวนแท่งใหม่ที่ได้รับ คือ {len(ohlcv_bars)}')
         else:
@@ -430,6 +429,7 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
     if chkLastPrice:
         try:
             ticker = await exchange.fetch_ticker(symbol)
+            logger.debug(f'{symbol}:ticker\n{ticker}')
             priceEntry = float(ticker['last'])
         except Exception as ex:
             print(type(ex).__name__, str(ex))
@@ -556,6 +556,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
                 notify_msg.append('สถานะ : Long\nCross Up')
+
+                logger.debug(f'{symbol}\n{df.tail(10)}')
             
                 if TPSLMode =='on':
                     pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
@@ -569,10 +571,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
                     notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
 
-                gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'LONG')
+                await gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'LONG')
                 
             elif tradeMode != 'on' :
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up'), 'LONG')
+                await gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up'), 'LONG')
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
             TPShort = config.TP_Short
@@ -601,6 +603,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
                 notify_msg.append('สถานะ : Short\nCross Down')
+
+                logger.debug(f'{symbol}\n{df.tail(10)}')
             
                 if TPSLMode == 'on':
                     pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
@@ -614,10 +618,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
                     notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
  
-                gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'SHORT')
+                await gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'SHORT')
 
             elif tradeMode != 'on' :
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down'), 'SHORT')
+                await gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down'), 'SHORT')
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -840,9 +844,6 @@ async def main():
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_title)
 
-    # แสดง status waiting ระหว่างที่รอ...
-    gather(waiting())
-
     await load_all_symbols()
 
     await load_symbols_setting()
@@ -934,7 +935,9 @@ if __name__ == "__main__":
         os.system("color") # enables ansi escape characters in terminal
         print(HIDE_CURSOR, end="")
         loop = get_event_loop()
-        loop.run_until_complete(main())
+        # แสดง status waiting ระหว่างที่รอ...
+        loop.create_task(main())
+        loop.run_until_complete(waiting())        
 
     except KeyboardInterrupt:
         print(CLS_LINE+'\rbye')
