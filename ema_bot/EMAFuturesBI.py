@@ -153,8 +153,7 @@ def add_indicator(symbol, bars):
         df = pd.concat([all_candles[symbol], df], ignore_index=False)
         if symbol in orders_history.keys() and orders_history[symbol]['check_candle'] == False:
             logger.debug(f'{symbol}\n{df.tail(5)}')
-            if symbol in orders_history.keys():
-                orders_history[symbol]['check_candle'] == True
+            orders_history[symbol]['check_candle'] = True
 
         # เอาแท่งซ้ำออก เหลืออันใหม่สุด
         df = df[~df.index.duplicated(keep='last')].tail(CANDLE_LIMIT)
@@ -557,7 +556,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await cancel_order(exchange, symbol)
                 notify_msg.append('สถานะ : Long\nCross Up')
 
-                logger.debug(f'{symbol}\n{df.tail(10)}')
+                logger.debug(f'{symbol} LONG\n{df.tail(3)}')
             
                 if TPSLMode =='on':
                     pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
@@ -571,10 +570,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
                     notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
 
-                await gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'LONG')
+                gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG') )
                 
             elif tradeMode != 'on' :
-                await gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up'), 'LONG')
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up', 'LONG') )
 
         elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
             TPShort = config.TP_Short
@@ -604,7 +603,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await cancel_order(exchange, symbol)
                 notify_msg.append('สถานะ : Short\nCross Down')
 
-                logger.debug(f'{symbol}\n{df.tail(10)}')
+                logger.debug(f'{symbol} SHORT\n{df.tail(10)}')
             
                 if TPSLMode == 'on':
                     pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
@@ -618,10 +617,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
                     notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
  
-                await gather( line_chart(symbol, df, '\n'.join(notify_msg)), 'SHORT')
+                gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT') )
 
             elif tradeMode != 'on' :
-                await gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down'), 'SHORT')
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down', 'SHORT') )
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -788,6 +787,7 @@ async def update_all_balance(marginType):
             print("Total Balance === {:,.4f}".format(balance_entry+sumMargin+sumProfit))
                 
         logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
+        logger.debug(orders_history)
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
