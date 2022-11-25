@@ -76,7 +76,7 @@ all_symbols = {}
 all_leverage = {}
 all_candles = {}
 
-order_detail = {'position':'', 'win':0, 'loss':0, 'check_candle':False}
+order_detail = {'position':'open', 'win':0, 'loss':0, 'check_candle':False}
 orders_history = {}
 
 RSI30 = [30 for i in range(0, CANDLE_PLOT)]
@@ -317,21 +317,32 @@ async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
     await gather( go_trade(exchange, symbol) )
 # order management zone --------------------------------------------------------
+async def set_order_history(positions_list):
+    global orders_history
+    for symbol in positions_list:
+        orders_history[symbol] = order_detail
+        orders_history[symbol]['check_candle'] = True
+    logger.debug(orders_history)
 async def add_order_history(symbol):
     global orders_history
-    if symbol in orders_history.keys():
-        orders_history[symbol]['check_candle'] = False
-    else:
+    if symbol not in orders_history.keys():
         orders_history[symbol] = order_detail
-async def upd_order_history(symbol):
+    orders_history[symbol]['check_candle'] = False
+async def close_order_history(symbol):
     global orders_history
-    if symbol in orders_history.keys():
-        positionInfo = all_positions.loc[all_positions['symbol']==symbol]
+    if symbol not in orders_history.keys():
+        orders_history[symbol] = order_detail
+    orders_history[symbol]['position'] = 'close'
+    orders_history[symbol]['check_candle'] = True
+    positionInfo = all_positions.loc[all_positions['symbol']==symbol]
+    logger.debug(positionInfo)
+    profit = 0
+    if not positionInfo.empty and float(positionInfo.iloc[-1]["unrealizedProfit"]) != 0:
         profit = float(positionInfo.iloc[-1]["unrealizedProfit"])
-        if profit > 0:
-            orders_history[symbol]['win'] = orders_history[symbol]['win']+1
-        else:
-            orders_history[symbol]['loss'] = orders_history[symbol]['loss']+1
+    if profit > 0:
+        orders_history[symbol]['win'] = orders_history[symbol]['win']+1
+    elif profit < 0:
+        orders_history[symbol]['loss'] = orders_history[symbol]['loss']+1
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
     order = await exchange.create_market_buy_order(symbol, amount)
@@ -342,7 +353,7 @@ async def long_enter(exchange, symbol, amount):
 #-------------------------------------------------------------------------------
 async def long_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_sell_order(symbol, positionAmt, params={"reduceOnly":True})
-    await upd_order_history(symbol)
+    await close_order_history(symbol)
     logger.info(order)
     return
 #-------------------------------------------------------------------------------
@@ -355,7 +366,7 @@ async def short_enter(exchange, symbol, amount):
 #-------------------------------------------------------------------------------
 async def short_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_buy_order(symbol, (positionAmt*-1), params={"reduceOnly":True})
-    await upd_order_history(symbol)
+    await close_order_history(symbol)
     logger.info(order)
     return
 #-------------------------------------------------------------------------------
@@ -363,7 +374,7 @@ async def cancel_order(exchange, symbol):
     await sleep(1)
     order = await exchange.cancel_all_orders(symbol, params={'conditionalOrdersOnly':False})
     logger.info(order)
-    return 
+    return
 #-------------------------------------------------------------------------------
 async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
     closetp=(closeRate/100)
@@ -472,7 +483,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
     #market_info = pd.DataFrame(await exchange.fapiPrivate_get_positionrisk(), columns=["symbol", "entryPrice", "leverage" ,"unrealizedProfit", "isolatedWallet", "positionAmt"])
 
-    if not positionInfo.empty and positionInfo.iloc[-1]["positionAmt"] != 0:
+    if not positionInfo.empty and float(positionInfo.iloc[-1]["positionAmt"]) != 0:
         positionAmt = float(positionInfo.iloc[-1]["positionAmt"])
 
     hasLongPosition = (positionAmt > 0)
@@ -480,8 +491,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
     # print(countTrade, positionAmt, hasLongPosition, hasShortPosition, amount)
 
-    # if positionAmt == 0:
-    #     await cancel_order(exchange, symbol)
+    if positionAmt == 0 and symbol in orders_history.keys():
+        await cancel_order(exchange, symbol)
 
     try:
         signalIdx = config.SignalIndex
@@ -603,7 +614,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await cancel_order(exchange, symbol)
                 notify_msg.append('สถานะ : Short\nCross Down')
 
-                logger.debug(f'{symbol} SHORT\n{df.tail(10)}')
+                logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
             
                 if TPSLMode == 'on':
                     pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
@@ -836,6 +847,25 @@ async def load_symbols_setting():
         print(type(ex).__name__, str(ex))
         logger.exception('load_symbols_setting')
 
+async def close_non_position_order(watch_list, positions_list):
+    try:
+        exchange = ccxt.binance({
+            "apiKey": config.API_KEY,
+            "secret": config.API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True}
+        )
+
+        loops = [cancel_order(exchange, symbol) for symbol in watch_list if symbol not in positions_list]
+        await gather(*loops)
+    
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.exception('update_all_balance')
+
+    finally:
+        await exchange.close()
+
 async def main():
     global start_balance_entry
 
@@ -871,6 +901,9 @@ async def main():
     # แสดงค่า positions & balance
     await update_all_balance(config.MarginType)
     start_balance_entry = balance_entry
+
+    await set_order_history(all_positions['symbol'].to_list())
+    await close_non_position_order(watch_list, all_positions['symbol'].to_list())
 
     try:
         start_ticker = time.time()
