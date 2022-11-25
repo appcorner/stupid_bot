@@ -76,7 +76,6 @@ all_symbols = {}
 all_leverage = {}
 all_candles = {}
 
-order_detail = {'position':'open', 'win':0, 'loss':0, 'check_candle':False}
 orders_history = {}
 
 RSI30 = [30 for i in range(0, CANDLE_PLOT)]
@@ -320,20 +319,36 @@ async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
 async def set_order_history(positions_list):
     global orders_history
     for symbol in positions_list:
-        orders_history[symbol] = order_detail
-        orders_history[symbol]['check_candle'] = True
+        orders_history[symbol] = {
+                'position': 'open', 
+                'win': 0, 
+                'loss': 0, 
+                'check_candle': True
+                }
     logger.debug(orders_history)
 async def add_order_history(symbol):
     global orders_history
     if symbol not in orders_history.keys():
-        orders_history[symbol] = order_detail
-    orders_history[symbol]['check_candle'] = False
+        orders_history[symbol] = {
+                'position': 'open', 
+                'win': 0, 
+                'loss': 0, 
+                'check_candle': False
+                }
+    else:
+        orders_history[symbol]['check_candle'] = False
 async def close_order_history(symbol):
     global orders_history
     if symbol not in orders_history.keys():
-        orders_history[symbol] = order_detail
-    orders_history[symbol]['position'] = 'close'
-    orders_history[symbol]['check_candle'] = True
+        orders_history[symbol] = {
+                'position': 'close', 
+                'win': 0, 
+                'loss': 0, 
+                'check_candle': True
+                }
+    else:
+        orders_history[symbol]['position'] = 'close'
+        orders_history[symbol]['check_candle'] = True
     positionInfo = all_positions.loc[all_positions['symbol']==symbol]
     logger.debug(positionInfo)
     profit = 0
@@ -491,8 +506,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
     # print(countTrade, positionAmt, hasLongPosition, hasShortPosition, amount)
 
-    if positionAmt == 0 and symbol in orders_history.keys():
-        await cancel_order(exchange, symbol)
+    # if positionAmt == 0 and symbol in orders_history.keys():
+    #     await cancel_order(exchange, symbol)
 
     try:
         signalIdx = config.SignalIndex
@@ -762,7 +777,7 @@ async def fetch_next_ohlcv(next_ticker):
         await exchange.close()
 
 async def update_all_balance(marginType):
-    global all_positions, balance_entry, count_trade
+    global all_positions, balance_entry, count_trade, orders_history
     try:
         exchange = ccxt.binance({
             "apiKey": config.API_KEY,
@@ -798,6 +813,14 @@ async def update_all_balance(marginType):
             print("Total Balance === {:,.4f}".format(balance_entry+sumMargin+sumProfit))
                 
         logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
+
+        loops = [cancel_order(exchange, symbol) for symbol in orders_history.keys() if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list()]
+        await gather(*loops)
+
+        for symbol in orders_history.keys():
+            if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list():
+                orders_history[symbol]['position'] = 'close' 
+    
         logger.debug(orders_history)
 
     except Exception as ex:
