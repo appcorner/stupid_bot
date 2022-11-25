@@ -8,6 +8,7 @@ open futures order by cross signal between fast and slow indicator
 - fix bug: แก้ปัญหาเปิด order เกิดจำนวน count trade
 - new: เจัดเก็บ order history เตรียมใช้ตรวจสอบ win/loss
 - new: ปรับการแสดงข้อมูล balance ให้มีรายละเอียดครบมากขึ้น
+- ลบ order ที่ค้าง กรณีที่ position ถูกปิดไปแล้ว
 
 ## v1.4.1
 - fix bug: ปัญหาการ set_leverage, ลำดับการทำงานการอ่าน multiple setting ต้องทำก่อนการ set_leverage
