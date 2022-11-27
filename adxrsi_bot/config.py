@@ -75,13 +75,21 @@ API_SECRET = get_str('binance','api_secret')
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 
 #------------------------------------------------------------
+# app_config
+#------------------------------------------------------------
+TIME_SHIFT = get_int('app_config', 'TIME_SHIFT', 5)
+CANDLE_LIMIT = get_int('app_config', 'CANDLE_LIMIT', 1000)
+CANDLE_PLOT = get_int('app_config', 'CANDLE_PLOT', 100)
+LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
+
+#------------------------------------------------------------
 # setting
 #------------------------------------------------------------
 timeframe = get_str('setting', 'timeframe', '5m')
 
-SignalIndex = get_int('setting', 'signal_index', -1)
+SignalIndex = get_int('setting', 'signal_index', -2)
 if SignalIndex > -1 or SignalIndex < -2:
-    SignalIndex = -1
+    SignalIndex = -2
 
 MarginType = get_str('setting', 'margin_type', 'USDT')
 
@@ -132,16 +140,22 @@ if is_exist('setting', 'active_tl_long'):
 if is_exist('setting', 'active_tl_short'):
     Active_TL_Short = get_float('setting', 'active_tl_short', 10.0)
 
-ADXPeriod = get_int('setting', 'adx_period')
-ADXIn = get_int('setting', 'adx_in')
-PositionOB = get_int('setting', 'position_ob')
-PositionOS = get_int('setting', 'position_os')
-ExitOB = get_int('setting', 'exit_ob')
-ExitOS = get_int('setting', 'exit_os')
-    
-MACD_FAST = get_int('setting', 'macd_fast')
-MACD_SLOW = get_int('setting', 'macd_slow')
-MACD_SIGNAL = get_int('setting', 'macd_signal')
-RSI_PERIOD = get_int('setting', 'rsi_period')
+ADXPeriod = get_int('setting', 'adx_period', 14)
+ADXIn = get_int('setting', 'adx_in', 25)
+
+PositionLong = get_str('setting', 'position_long', 'up')
+PositionValueLong = get_int('setting', 'position_value_long', 70)
+PositionShort = get_str('setting', 'position_short', 'down')
+PositionValueShort = get_int('setting', 'position_value_short', 30)
+
+ExitLong = get_str('setting', 'exit_long', 'down')
+ExitValueLong = get_int('setting', 'exit_value_long', 50)
+ExitShort = get_str('setting', 'exit_short', 'up')
+ExitValueShort = get_int('setting', 'exit_value_short', 50)
+
+MACD_FAST = get_int('setting', 'macd_fast', 12)
+MACD_SLOW = get_int('setting', 'macd_slow', 26)
+MACD_SIGNAL = get_int('setting', 'macd_signal', 9)
+RSI_PERIOD = get_int('setting', 'rsi_period', 14)
 
 CSV_NAME = get_str('symbols_setting', 'csv_name', None)

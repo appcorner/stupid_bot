@@ -4,6 +4,9 @@
 
 open futures order by ADX+RSI indicator
 
+## v1.1
+- revise ADX,RSI signal for Enter/Exit
+
 ## v1.0
 - capture trading signal by ADX+RSI indacator
 - code from ema_bot structure

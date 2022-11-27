@@ -19,7 +19,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'ADX+RSI Futures (Binance) version 1.0'
+bot_name = 'ADX+RSI Futures (Binance) version 1.1'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -33,7 +33,7 @@ CEND = '\033[0m'
 CBOLD = '\33[1m'
 
 # กำหนดเวลาที่ต้องการเลื่อนการอ่านข้อมูล เป็นจำนวนวินาที
-TIME_SHIFT = 5
+TIME_SHIFT = config.TIME_SHIFT
 
 TIMEFRAME_SECONDS = {
     '1m': 60,
@@ -50,8 +50,8 @@ TIMEFRAME_SECONDS = {
     '1d': 60*60*24,
 }
 
-CANDLE_LIMIT = 1000
-CANDLE_PLOT = 100
+CANDLE_LIMIT = config.CANDLE_LIMIT
+CANDLE_PLOT = config.CANDLE_PLOT
 
 # ----------------------------------------------------------------------------
 # global variable
@@ -59,7 +59,7 @@ CANDLE_PLOT = 100
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
 logger = logging.getLogger("App Log")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(config.LOG_LEVEL)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler = RotatingFileHandler('app.log', maxBytes=200000, backupCount=5)
 handler.setFormatter(formatter)
@@ -71,14 +71,10 @@ count_trade = 0
 start_balance_entry = 0.0
 balance_entry = 0.0
 
-watch_list = {}
+watch_list = []
 all_symbols = {}
 all_leverage = {}
 all_candles = {}
-
-RSI30 = [30 for i in range(0, CANDLE_PLOT)]
-# RSI50 = [50 for i in range(0, CANDLE_PLOT)]
-RSI70 = [70 for i in range(0, CANDLE_PLOT)]
 
 CSV_COLUMNS = [
         "symbol", "signal_index", "margin_type",
@@ -91,21 +87,25 @@ CSV_COLUMNS = [
         "trailing_stop_mode",
         "callback_long", "callback_short",
         "active_tl_long", "active_tl_short",
-        "adx_period", "adx_in", "position_ob", "position_os", "exit_ob", "exit_os"
+        "adx_period", "adx_in",
+        "position_long", "position_value_long", "position_short", "position_value_short",
+        "exit_long", "exit_value_long", "exit_short", "exit_value_short"
         ]
 symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
 
-async def line_chart(symbol, df, msg, **kwargs):
+async def line_chart(symbol, df, msg, pd='', **kwargs):
     data = df.tail(CANDLE_PLOT)
 
     ADXLine = [kwargs['ADXIn'] for i in range(0, CANDLE_PLOT)]
+    RSIlo = [kwargs['RSIlo'] for i in range(0, CANDLE_PLOT)]
+    RSIhi = [kwargs['RSIhi'] for i in range(0, CANDLE_PLOT)]
 
-    colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
+    # colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
     added_plots = [
         mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue',width=0.75,
             fill_between=dict(y1=30, y2=70, color="#F1B595"),ylabel=f"RSI ({config.RSI_PERIOD})"),
-        mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
-        mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+        mpf.make_addplot(RSIlo,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+        mpf.make_addplot(RSIhi,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
         mpf.make_addplot(data['ADX'],ylim=(0, 90),panel=3,color='red',width=0.75,ylabel=f"ADX ({config.ADXPeriod})"),
         mpf.make_addplot(ADXLine,ylim=(0, 90),panel=3,color='red',linestyle='-.',width=0.5),
         # mpf.make_addplot(data['MACD'],panel=3,type='bar',width=0.7,color=colors),
@@ -119,7 +119,7 @@ async def line_chart(symbol, df, msg, **kwargs):
         figratio=(8, 6),
         panel_ratios=(8,2,2,2),
         type="candle",
-        title=f'{symbol} ({config.timeframe} @ {data.index[-1]})',
+        title=f'{symbol} {pd} ({config.timeframe} @ {data.index[-1]})',
         addplot=added_plots,
         tight_layout=True,
         style="yahoo",
@@ -152,9 +152,9 @@ def add_indicator(symbol, bars):
     # คำนวนค่าต่างๆใหม่
     df['ADX'] = 0
     df['RSI'] = 0
-    df['MACD'] = 0
-    df['MACDs'] = 0
-    df['MACDh'] = 0
+    # df['MACD'] = 0
+    # df['MACDs'] = 0
+    # df['MACDh'] = 0
 
     try:
         ADXPeriod = config.ADXPeriod 
@@ -163,11 +163,11 @@ def add_indicator(symbol, bars):
             ADXPeriod = symbols_setting.loc[symbol]['adx_period']
 
         # cal MACD
-        ewm_fast     = df['close'].ewm(span=config.MACD_FAST, adjust=False).mean()
-        ewm_slow     = df['close'].ewm(span=config.MACD_SLOW, adjust=False).mean()
-        df['MACD']   = ewm_fast - ewm_slow
-        df['MACDs']  = df['MACD'].ewm(span=config.MACD_SIGNAL).mean()
-        df['MACDh']  = df['MACD'] - df['MACDs']
+        # ewm_fast     = df['close'].ewm(span=config.MACD_FAST, adjust=False).mean()
+        # ewm_slow     = df['close'].ewm(span=config.MACD_SLOW, adjust=False).mean()
+        # df['MACD']   = ewm_fast - ewm_slow
+        # df['MACDs']  = df['MACD'].ewm(span=config.MACD_SIGNAL).mean()
+        # df['MACDh']  = df['MACD'] - df['MACDs']
 
         # cal ADX
         adx = ta.adx(df['high'],df['low'],df['close'],ADXPeriod)
@@ -405,11 +405,15 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
         trailingStopMode = config.Trailing_Stop_Mode
         costType = config.CostType
         costAmount = config.CostAmount
-        positionOB = config.PositionOB
-        exitOB = config.ExitOB
-        positionOS = config.PositionOS
-        exitOS = config.ExitOS
         adxIn = config.ADXIn
+        positionLong = config.PositionLong
+        positionValueLong = config.PositionValueLong
+        positionShort = config.PositionShort
+        positionValueShort = config.PositionValueShort
+        exitLong = config.ExitLong
+        exitValueLong = config.ExitValueLong
+        exitShort = config.ExitShort
+        exitValueShort = config.ExitValueShort
         if symbol in symbols_setting.index:
             signalIdx = int(symbols_setting.loc[symbol]['signal_index'])
             tradeMode = symbols_setting.loc[symbol]['trade_mode']
@@ -417,49 +421,68 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             trailingStopMode = symbols_setting.loc[symbol]['trailing_stop_mode']
             costType = symbols_setting.loc[symbol]['cost_type']
             costAmount = float(symbols_setting.loc[symbol]['cost_amount'])
-            positionOB = int(symbols_setting.loc[symbol]['position_ob'])
-            exitOB = int(symbols_setting.loc[symbol]['exit_ob'])
-            positionOS = int(symbols_setting.loc[symbol]['position_os'])
-            exitOS = int(symbols_setting.loc[symbol]['exit_os'])
             adxIn = int(symbols_setting.loc[symbol]['adx_in'])
+            positionLong = symbols_setting.loc[symbol]['position_long']
+            positionValueLong = int(symbols_setting.loc[symbol]['position_value_long'])
+            positionShort = symbols_setting.loc[symbol]['position_short']
+            positionValueShort = int(symbols_setting.loc[symbol]['position_value_short'])
+            exitLong = symbols_setting.loc[symbol]['exit_long']
+            exitValueLong = int(symbols_setting.loc[symbol]['exit_value_long'])
+            exitShort = symbols_setting.loc[symbol]['exit_short']
+            exitValueShort = int(symbols_setting.loc[symbol]['exit_value_short'])
 
         kwargs = dict(
             ADXIn=adxIn,
+            RSIhi=positionValueLong,
+            RSIlo=positionValueShort
         )
 
         rsi = (df.iloc[signalIdx-1]['RSI'], df.iloc[signalIdx]['RSI'])
         adxLast = df.iloc[signalIdx]['ADX']
+        # close = (df.iloc[signalIdx-1]['close'], df.iloc[signalIdx]['close'])
 
-        # ขึ้น-กระทิง
-        isBullish = (rsi[0] < positionOB and rsi[1] >= positionOB and adxLast >= adxIn)
-        # Short Exit
-        isBullishExit = (positionOB < 50 and rsi[1] >= exitOS) or (positionOB > 50 and rsi[1] <= exitOS)
-        # ลง-หมี
-        isBearish = (rsi[0] > positionOS and rsi[1] <= positionOS and adxLast >= adxIn)
+        # Long Enter
+        isLongEnter = adxLast > adxIn and (
+                (positionLong == 'up' and rsi[0] < positionValueLong and rsi[1] > positionValueLong) or
+                (positionLong == 'down' and rsi[0] > positionValueLong and rsi[1] < positionValueLong)
+                )
+        
         # Long Exit
-        isBearishExit = (positionOB > 50 and rsi[1] <= exitOB) or (positionOB < 50 and rsi[1] >= exitOB)
-        # print(symbol, isBullish, isBearish, fast, slow)
+        isLongExit = (exitLong == 'up' and rsi[1] > exitValueLong) or (exitLong == 'down' and rsi[1] < exitValueLong)        
+
+        # Short Enter
+        isShortEnter = adxLast > adxIn and (
+                (positionShort == 'up' and rsi[0] > positionValueShort and rsi[1] < positionValueShort) or
+                (positionShort == 'down' and rsi[0] < positionValueShort and rsi[1] > positionValueShort)
+                )
+
+        # Short Exit
+        isShortExit = (exitShort == 'up' and rsi[1] > exitValueShort) or (exitShort == 'down' and rsi[1] < exitValueShort)
+
+        # print(symbol, isBullish, isBearish, rsi, adxLast)
 
         closePrice = df.iloc[-1]["close"]
 
-        if tradeMode == 'on' and isBullishExit == True and hasShortPosition == True:
+        if tradeMode == 'on' and isShortExit == True and hasShortPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await short_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Short Exit processing...")
-            notify.Send_Text(f'{symbol}\nสถานะ : Short RSI Exit\n{round(rsi[1],1)}')
             await cancel_order(exchange, symbol)
+            # notify.Send_Text(f'{symbol}\nสถานะ : Short RSI Exit\n{round(rsi[1],1)}')
+            gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short RSI Exit\n{round(rsi[1],1)}', 'SHORT EXIT', **kwargs) )
 
-        elif tradeMode == 'on' and isBearishExit == True and hasLongPosition == True:
+        elif tradeMode == 'on' and isLongExit == True and hasLongPosition == True:
             count_trade = count_trade-1 if count_trade > 0 else 0
             await long_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Long Exit processing...")
-            notify.Send_Text(f'{symbol}\nสถานะ : Long RSI Exit\n{round(rsi[1],1)}')
             await cancel_order(exchange, symbol)
+            # notify.Send_Text(f'{symbol}\nสถานะ : Long RSI Exit\n{round(rsi[1],1)}')
+            gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long RSI Exit\n{round(rsi[1],1)}', 'LONG EXIT', **kwargs) )
 
         notify_msg = []
         notify_msg.append(symbol)
 
-        if isBullish == True and config.Long == 'on' and hasLongPosition == False:
+        if isLongEnter == True and config.Long == 'on' and hasLongPosition == False:
             TPLong = config.TP_Long
             TPCloseLong = config.TPclose_Long
             SLLong = config.SL_Long
@@ -477,11 +500,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             # print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} LONG')
             if tradeMode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                count_trade += 1
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
-                count_trade += 1
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
@@ -499,12 +522,12 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
                     notify_msg.append(f'สถานะ : Long set TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
 
-                gather( line_chart(symbol, df, '\n'.join(notify_msg), **kwargs) )
+                gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG', **kwargs) )
                 
             elif tradeMode != 'on' :
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}', **kwargs) )
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}', 'LONG', **kwargs) )
 
-        elif isBearish == True and config.Short == 'on' and hasShortPosition == False:
+        elif isShortEnter == True and config.Short == 'on' and hasShortPosition == False:
             TPShort = config.TP_Short
             TPCloseShort = config.TPclose_Short
             SLShort = config.SL_Short
@@ -522,11 +545,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             # print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} SHORT')
             if tradeMode == 'on' and limitTrade > count_trade and balance_entry > config.Not_Trade:
+                count_trade += 1
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry -= (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
-                count_trade += 1
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
@@ -544,10 +567,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print(f'[{symbol}] Set Trailing Stop {priceTL}')
                     notify_msg.append(f'สถานะ : Short set TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
  
-                gather( line_chart(symbol, df, '\n'.join(notify_msg), **kwargs) )
+                gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT', **kwargs) )
 
             elif tradeMode != 'on' :
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}', **kwargs) )
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}', 'SHORT', **kwargs) )
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -689,21 +712,30 @@ async def update_all_balance(marginType):
 
         balance = await exchange.fetch_balance()
         positions = balance['info']['positions']
-        all_positions = pd.DataFrame([position for position in positions if float(position['positionAmt']) != 0],
+        # note: filter -> str(position['symbol']).endswith(marginType)
+        all_positions = pd.DataFrame([position for position in positions 
+            if position['symbol'].endswith(marginType) and float(position['positionAmt']) != 0],
             # columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
             columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
+        all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
         count_trade = len(all_positions)
         freeBalance =  await exchange.fetch_free_balance()
         balance_entry = float(freeBalance[marginType])
-        profit_loss = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
+        sumProfit = pd.Series(all_positions['unrealizedProfit'].apply(lambda x: float(x))).sum()
+        sumMargin = pd.Series(all_positions['initialMargin'].apply(lambda x: float(x))).sum()
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.2f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
-        all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
+        balance_change = balance_entry-start_balance_entry if start_balance_entry > 0 else 0
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
-            print("countTrade ===================", f'{count_trade}/{config.limit_Trade}')
-            print("balance_entry ================", balance_entry, "change", "{:+g}".format(profit_loss))
+            print("Count Trade =====", f'{count_trade}/{config.limit_Trade} {marginType}')
+            print("Balance Entry === {:,.4f}".format(balance_entry), 
+                "change: {:+,.4f}".format(balance_change),
+                "margit: {:+,.4f}".format(sumMargin),
+                "profit: {:+,.4f}".format(sumProfit)
+                )
+            print("Total Balance === {:,.4f}".format(balance_entry+sumMargin+sumProfit))
 
         logger.info(f'countTrade:{count_trade} balance_entry:{balance_entry}')
 
@@ -729,7 +761,9 @@ async def load_symbols_setting():
                 # validate all values
                 int_columns = [
                         'signal_index', 'leverage',
-                        "adx_period", "adx_in", "position_ob", "position_os", "exit_ob", "exit_os"
+                        "adx_period", "adx_in",
+                        "position_value_long", "position_value_short",
+                        "exit_value_long", "exit_value_short"
                         ]
                 float_columns = [
                         'cost_amount', 
@@ -758,8 +792,10 @@ async def load_symbols_setting():
 async def main():
     global start_balance_entry
 
+    bot_title = f'{bot_name} - {config.timeframe}'
+
     # set cursor At top, left (1,1)
-    print(CLS_SCREEN+bot_name)
+    print(CLS_SCREEN+bot_title)
 
     # แสดง status waiting ระหว่างที่รอ...
     gather(waiting())
@@ -798,7 +834,7 @@ async def main():
             seconds = time.time()
             if seconds >= next_ticker + TIME_SHIFT: # ครบรอบ
                 # set cursor At top, left (1,1)
-                print(CLS_SCREEN+bot_name)
+                print(CLS_SCREEN+bot_title)
 
                 local_time = time.ctime(seconds)
                 print(f'calculate new indicator: {local_time}')
@@ -820,7 +856,7 @@ async def main():
 
             elif config.Trade_Mode == 'on' and seconds >= next_ticker_1m + TIME_SHIFT:
                 # set cursor At top, left (1,1)
-                print(CLS_SCREEN+bot_name)
+                print(CLS_SCREEN+bot_title)
                 balance_time = time.ctime(seconds)
                 print(f'last indicator: {local_time}, last balance: {balance_time}')
                 await update_all_balance(config.MarginType)
