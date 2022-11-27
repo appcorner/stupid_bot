@@ -71,7 +71,7 @@ LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 #------------------------------------------------------------
 # app_config
 #------------------------------------------------------------
-TIME_SHIFT = get_int('app_config', 'TIME_SHIFT', 10)
+TIME_SHIFT = get_int('app_config', 'TIME_SHIFT', 5)
 CANDLE_LIMIT = get_int('app_config', 'CANDLE_LIMIT', 1000)
 CANDLE_PLOT = get_int('app_config', 'CANDLE_PLOT', 100)
 LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
@@ -147,3 +147,9 @@ MACD_SIGNAL = get_int('setting', 'macd_signal')
 RSI_PERIOD = get_int('setting', 'rsi_period')
 
 CSV_NAME = get_str('symbols_setting', 'csv_name', None)
+
+TP_IfPNL_Gt = get_float('mm', 'tp_if_pnl_gt', 0.0)
+SL_IfPNL_Lt = get_float('mm', 'sl_if_pnl_lt', 0.0)
+TP_IfAllProfit_Gt = get_float('mm', 'tp_if_all_profit_gt', 0.0)
+SL_IfAllProfit_Lt = get_float('mm', 'sl_if_all_profit_lt', 0.0)
+Loss_Limit = get_int('mm', 'loss_limit', 0)
