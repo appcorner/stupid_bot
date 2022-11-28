@@ -4,6 +4,11 @@
 
 open futures order by ADX+RSI indicator
 
+## v1.1.1
+- เพิ่ม TP SL by PNL
+- ตั้งเปิด-ปิด position ตาม profit
+- limit loss ถ้าเกิน limit เอาออกจาก watch_list ไปก่อน จนกว่าจะ restart bot
+
 ## v1.1
 - revise ADX,RSI signal for Enter/Exit
 

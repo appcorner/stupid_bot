@@ -54,3 +54,18 @@ rsi_period = 14
 
 [symbols_setting]
 ; csv_name = symbol_config.csv
+
+[mm]
+; take profit if PNL gather than $1.5
+tp_if_pnl_gt = 1.5
+; stop loss if PNL less than -$1.5
+sl_if_pnl_lt = -1.5
+
+; take profit if all Profit gather than $5
+tp_if_all_profit_gt = 5
+; stop loss if all Profit less than -$5
+sl_if_all_profit_lt = -5
+
+; loss counter, move symbol out of wishlists if more then loss_limit
+; reset loss counter by restart bot
+loss_limit = 3
