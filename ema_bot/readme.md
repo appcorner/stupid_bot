@@ -4,6 +4,9 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.4
+- bug fix
+
 ## v1.4.3 beta
 - เพิ่ม TP SL by PNL
 - ตั้งเปิด-ปิด position ตาม profit

@@ -470,7 +470,7 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
 
     logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} amt:{amount}')
 
-    return (priceEntry, amount)
+    return (float(priceEntry), float(amount))
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade
@@ -554,7 +554,6 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             # notify.Send_Text(f'{symbol}\nสถานะ : Long Exit')
             gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long Exit', 'LONG EXIT') )
             
-
         notify_msg = []
         notify_msg.append(symbol)
 
@@ -592,13 +591,13 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
                     pricesl = priceEntry - (priceEntry * (SLLong / 100.0))
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseLong)
-                    print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify_msg.append(f'# TPSL\nTP: {TPLong}%\nTP close: {TPCloseLong}%\nSL: {SLLong}%')
+                    print(f'[{symbol}] Set TP {pricetp:.4f} SL {pricesl:.4f}')
+                    notify_msg.append(f'# TPSL\nTP: {TPLong:.2f}%\nTP close: {TPCloseLong:.2f}%\nSL: {SLLong:.2f}%')
                 if trailingStopMode =='on':
                     priceTL = priceEntry +(priceEntry * (activeTLLong / 100.0))
                     await long_TLSTOP(exchange, symbol, amount, priceTL, callbackLong)
-                    print(f'[{symbol}] Set Trailing Stop {priceTL}')
-                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
+                    print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: {round(priceTL,5):.4f} {config.MarginType}')
 
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG') )
                 
@@ -639,13 +638,13 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
                     pricesl = priceEntry + (priceEntry * (SLShort / 100.0))
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseShort)
-                    print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                    notify_msg.append(f'# TPSL\nTP: {TPShort}%\nTP close: {TPCloseShort}%\nSL: {SLShort}%')
+                    print(f'[{symbol}] Set TP {pricetp:.4f} SL {pricesl:.4f}')
+                    notify_msg.append(f'# TPSL\nTP: {TPShort:.2f}%\nTP close: {TPCloseShort:.2f}%\nSL: {SLShort:.2f}%')
                 if trailingStopMode == 'on':
                     priceTL = priceEntry - (priceEntry * (activeTLShort / 100.0))
                     await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
-                    print(f'[{symbol}] Set Trailing Stop {priceTL}')
-                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort}%\nActive Price: {round(priceTL,5)} {config.MarginType}')
+                    print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: {round(priceTL,5):.4f} {config.MarginType}')
  
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT') )
 
@@ -849,7 +848,7 @@ async def mm_strategy(marginType):
 
             if config.SL_IfPNL_Lt < 0:
                 sl_lists = [position for position in mm_positions if float(position['unrealizedProfit']) < config.SL_IfPNL_Lt]
-                if len(tp_lists) > 0:
+                if len(sl_lists) > 0:
                     exit_loops = []
                     cancel_loops = []
                     for position in sl_lists:
