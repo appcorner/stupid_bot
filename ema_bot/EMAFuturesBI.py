@@ -19,7 +19,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4.3 beta'
+bot_name = 'EMA Futures (Binance) version 1.4.4'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -803,6 +803,7 @@ async def mm_strategy(marginType):
 
             exit_loops = []
             cancel_loops = []
+            mm_notify = []
             # exit all positions
             for position in mm_positions:
                 symbol = position['symbol']
@@ -810,14 +811,19 @@ async def mm_strategy(marginType):
                 if positionAmt > 0.0:
                     print(f"[{symbol}] สถานะ : MM Long Exit processing...")
                     exit_loops.append(long_close(exchange, symbol, positionAmt))
-                    notify.Send_Text(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
+                    # notify.Send_Text(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
+                    mm_notify.append(f'{symbol} : MM Long Exit')
                 elif positionAmt < 0.0:
                     print(f"[{symbol}] สถานะ : MM Short Exit processing...")
                     exit_loops.append(short_close(exchange, symbol, positionAmt))
-                    notify.Send_Text(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
+                    # notify.Send_Text(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
+                    mm_notify.append(f'{symbol} : MM Short Exit')
                 cancel_loops.append(cancel_order(exchange, symbol))
             await gather(*exit_loops)
             await gather(*cancel_loops)
+            if len(mm_notify) > 0:
+                txt_notify = '\n'.join(mm_notify)
+                notify.Send_Text(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
             logger.debug(mm_positions)
         
         else:
