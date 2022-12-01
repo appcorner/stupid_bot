@@ -8,6 +8,7 @@ open futures order by ADX+RSI indicator
 - เพิ่ม TP SL by PNL
 - ตั้งเปิด-ปิด position ตาม profit
 - limit loss ถ้าเกิน limit เอาออกจาก watch_list ไปก่อน จนกว่าจะ restart bot
+- คำนวน profit แยก position direction (Long/Short) เพื่แใช้เปิด-ปิด position
 
 ## v1.1
 - revise ADX,RSI signal for Enter/Exit
@@ -83,6 +84,31 @@ open futures order by ADX+RSI indicator
     [symbols_setting]
     ; ชื่อไฟล์ที่เก็บ setting ต้องเป็นไฟล์ csv
     csv_name = symbol_config.csv
+
+    [mm]
+    ; take profit if PNL gather than tp_if_pnl_gt, 0 = not active
+    tp_if_pnl_gt = 0.0
+    ; stop loss if PNL less than sl_if_pnl_lt, 0 = not active
+    sl_if_pnl_lt = -0.0
+
+    ; take profit if all Profit gather than tp_if_all_profit_gt, 0 = not active
+    tp_if_all_profit_gt = 0.0
+    ; stop loss if all Profit less than sl_if_all_profit_lt, 0 = not active
+    sl_if_all_profit_lt = -0.0
+
+    ; take profit if all Long Profit gather than tp_if_long_profit_gt, 0 = not active
+    tp_if_long_profit_gt = 2.5
+    ; stop loss if all Long Profit less than sl_if_long_profit_lt, 0 = not active
+    sl_if_long_profit_lt = -2.5
+
+    ; take profit if all Short Profit gather than tp_if_short_profit_gt, 0 = not active
+    tp_if_short_profit_gt = 2.5
+    ; take profit if all Short Profit gather than sl_if_short_profit_lt, 0 = not active
+    sl_if_short_profit_lt = -2.5
+
+    ; loss counter, move symbol out of wishlists if more then loss_limit, 0 = not active
+    ; reset loss counter by restart bot
+    loss_limit = 0
 
 ## donate
 - ETH: 0xeAfe7f1Db46E2c007b60174EB4527ab38bd54B54
