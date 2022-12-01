@@ -8,7 +8,7 @@ open futures order by ADX+RSI indicator
 - เพิ่ม TP SL by PNL
 - ตั้งเปิด-ปิด position ตาม profit
 - limit loss ถ้าเกิน limit เอาออกจาก watch_list ไปก่อน จนกว่าจะ restart bot
-- คำนวน profit แยก position direction (Long/Short) เพื่แใช้เปิด-ปิด position
+- คำนวน profit แยก position direction (Long/Short) เพื่อใช้เปิด-ปิด position
 
 ## v1.1
 - revise ADX,RSI signal for Enter/Exit
