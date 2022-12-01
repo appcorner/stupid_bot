@@ -6,6 +6,7 @@ open futures order by cross signal between fast and slow indicator
 
 ## v1.4.4
 - bug fix
+- คำนวน profit แยก position direction (Long/Short) เพื่อใช้เปิด-ปิด position
 
 ## v1.4.3 beta
 - เพิ่ม TP SL by PNL
@@ -101,15 +102,25 @@ open futures order by cross signal between fast and slow indicator
     csv_name = symbol_config.csv
 
     [mm]
-    ; take profit if PNL gather than tp_if_pnl_gt, 0 = not active
+    ; TP: ปิด position ถ้าค่า PNL มากกว่า tp_if_pnl_gt, 0 = ปิดการทำงาน
     tp_if_pnl_gt = 0.0
-    ; stop loss if PNL less than sl_if_pnl_lt, 0 = not active
+    ; SL: ปิด position ถ้าค่า PNL น้อยกว่า sl_if_pnl_lt, 0 = ปิดการทำงาน
     sl_if_pnl_lt = -0.0
 
-    ; take profit if all Profit gather than tp_if_all_profit_gt, 0 = not active
+    ; TP: ปิด position ทั้งหมด ถ้าค่า Profit รวมแล้วมากกว่า tp_if_all_profit_gt, 0 = not active
     tp_if_all_profit_gt = 0.0
     ; stop loss if all Profit less than sl_if_all_profit_lt, 0 = not active
     sl_if_all_profit_lt = -0.0
+
+    ; take profit if all Long Profit gather than tp_if_long_profit_gt, 0 = not active
+    tp_if_long_profit_gt = 2.5
+    ; stop loss if all Long Profit less than sl_if_long_profit_lt, 0 = not active
+    sl_if_long_profit_lt = -2.5
+
+    ; take profit if all Short Profit gather than tp_if_short_profit_gt, 0 = not active
+    tp_if_short_profit_gt = 2.5
+    ; take profit if all Short Profit gather than sl_if_short_profit_lt, 0 = not active
+    sl_if_short_profit_lt = -2.5
 
     ; loss counter, move symbol out of wishlists if more then loss_limit, 0 = not active
     ; reset loss counter by restart bot

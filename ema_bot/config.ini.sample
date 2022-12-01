@@ -64,3 +64,17 @@ sl_if_pnl_lt = -1.5
 tp_if_all_profit_gt = 5
 ; stop loss if all Profit less than -$5
 sl_if_all_profit_lt = -5
+
+; take profit if all Long Profit gather than $2.5
+tp_if_long_profit_gt = 2.5
+; stop loss if all Long Profit less than -$2.5
+sl_if_long_profit_lt = -2.5
+
+; take profit if all Short Profit gather than $2.5
+tp_if_short_profit_gt = 2.5
+; take profit if all Short Profit gather than $2.5
+sl_if_short_profit_lt = -2.5
+
+; loss counter, move symbol out of wishlists if more then loss_limit
+; reset loss counter by restart bot
+loss_limit = 3

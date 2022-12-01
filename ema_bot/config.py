@@ -150,6 +150,14 @@ CSV_NAME = get_str('symbols_setting', 'csv_name', None)
 
 TP_IfPNL_Gt = get_float('mm', 'tp_if_pnl_gt', 0.0)
 SL_IfPNL_Lt = get_float('mm', 'sl_if_pnl_lt', 0.0)
+
 TP_IfAllProfit_Gt = get_float('mm', 'tp_if_all_profit_gt', 0.0)
 SL_IfAllProfit_Lt = get_float('mm', 'sl_if_all_profit_lt', 0.0)
+
+TP_IfLongProfit_Gt = get_float('mm', 'tp_if_long_profit_gt', 0.0)
+SL_IfLongProfit_Lt = get_float('mm', 'sl_if_long_profit_lt', 0.0)
+
+TP_IfShortProfit_Gt = get_float('mm', 'tp_if_short_profit_gt', 0.0)
+SL_IfShortProfit_Lt = get_float('mm', 'sl_if_short_profit_lt', 0.0)
+
 Loss_Limit = get_int('mm', 'loss_limit', 0)
