@@ -4,6 +4,10 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.5
+- แยกนับ limit position ตาม direction (Long/Short)
+- revise: log/notify, mm
+
 ## v1.4.4
 - bug fix
 - คำนวน profit แยก position direction (Long/Short) เพื่อใช้เปิด-ปิด position
