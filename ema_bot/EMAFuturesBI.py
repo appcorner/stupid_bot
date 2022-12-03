@@ -9,6 +9,7 @@ import os
 import pathlib
 import logging
 from logging.handlers import RotatingFileHandler
+from random import randint
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -493,6 +494,10 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
 async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade_long, count_trade_short
 
+    # delay เพื่อให้กระจายการ trade ของ symbol มากขึ้น
+    delay = randint(1,5)
+    await sleep(delay)
+
     # อ่านข้อมูลแท่งเทียนที่เก็บไว้ใน all_candles
     if symbol in all_candles.keys() and len(all_candles[symbol]) >= CANDLE_LIMIT:
         df = all_candles[symbol]
@@ -804,7 +809,6 @@ async def fetch_next_ohlcv(next_ticker):
     finally:
         await exchange.close()
 
-# async def mm_strategy(marginType):
 async def mm_strategy(exchange, mm_positions):
     try:
         # sumProfit = sum([float(position['unrealizedProfit']) for position in mm_positions])
@@ -997,7 +1001,7 @@ async def update_all_balance(marginType, checkMM=True):
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
-            print(f"Count Trade ===== #Long {count_trade_long}/{config.limit_Trade_Long} #Short{count_trade_short}/{config.limit_Trade_Short} {marginType}")
+            print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
             print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.4f} Profit: {sumProfit:+,.4f}")
             print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
                 
@@ -1082,7 +1086,7 @@ async def close_non_position_order(watch_list, positions_list):
 async def main():
     global start_balance_total
 
-    bot_title = f'{bot_name} - {config.timeframe}'
+    bot_title = f'{bot_name} - {config.timeframe} - {config.MarginType}'
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_title)
