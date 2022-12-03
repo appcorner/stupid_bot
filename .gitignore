@@ -130,6 +130,10 @@ dmypy.json
 binance_bot/config.ini
 ema_bot/config.ini
 ema_bot/plots/
+ema_bot/logs/
 adxrsi_bot/config.ini
 adxrsi_bot/plots/
+ema_bot/logs/
 *.ini
+*.log
+*.log.*
