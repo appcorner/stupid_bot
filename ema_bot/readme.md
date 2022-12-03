@@ -62,8 +62,9 @@ open futures order by cross signal between fast and slow indicator
     cost_type = $
     cost_amount = 1.5
 
-    ; กำหนดจำนวน positions จะไม่เกิน limit_trade
-    limit_trade = 10
+    ; กำหนดจำนวน positions แยกตาม long, short จะไม่เกิน limit_trade_long และ limit_trade_short
+    limit_trade_long = 5
+    limit_trade_short = 5
     ; กำหนดจำนวน balance ขั้นต่ำ จะไม่เปิด position ใหม่ ถ้า balance เหลือต่ำกว่า not_trade
     not_trade = 10.0
 
