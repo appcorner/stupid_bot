@@ -15,6 +15,18 @@ def get_list(group, name, default=[]):
         print(f'config {group}.{name} not found, set default to {default}')
     return value
 
+def get_list_float(group, name, default=[]):
+    value = default
+    try:
+        if is_exist(group, name):
+            value = [float(x.strip()) for x in config[group][name].split(',')]
+        else:
+            print(f'config {group}.{name} not found, set default to {default}')
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        print(f'config {group}.{name} not found, set default to {default}')
+    return value
+
 def get_str(group, name, default=''):
     value = default
     try:
@@ -64,12 +76,6 @@ API_KEY = get_str('binance','api_key')
 API_SECRET = get_str('binance','api_secret')
 
 #------------------------------------------------------------
-# bitkub
-#------------------------------------------------------------
-# BK_API_KEY = get_str('bitkub','api_key')
-# BK_API_SECRET = get_str('bitkub','api_secret')
-
-#------------------------------------------------------------
 # line
 #------------------------------------------------------------
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
@@ -81,6 +87,9 @@ TIME_SHIFT = get_int('app_config', 'TIME_SHIFT', 5)
 CANDLE_LIMIT = get_int('app_config', 'CANDLE_LIMIT', 1000)
 CANDLE_PLOT = get_int('app_config', 'CANDLE_PLOT', 100)
 LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
+UB_TIMER_MODE = get_int('app_config', 'UB_TIMER_MODE', 4)
+if UB_TIMER_MODE < 0 or UB_TIMER_MODE > 5:
+    UB_TIMER_MODE = 4
 
 #------------------------------------------------------------
 # setting
@@ -103,8 +112,16 @@ automaxLeverage = get_str('setting', 'auto_max_leverage', 'off')
 Leverage = get_int('setting', 'leverage', 20)
 CostType = get_str('setting', 'cost_type', '$')
 CostAmount = get_float('setting', 'cost_amount', 1.5)
-limit_Trade = get_int('setting', 'limit_trade', 10)
+
+limit_Trade_Long = get_int('setting', 'limit_trade_long', 5)
+limit_Trade_Short = get_int('setting', 'limit_trade_short', 5)
+limit_Trade = get_int('setting', 'limit_trade', limit_Trade_Long+limit_Trade_Short)
+if (limit_Trade_Long + limit_Trade_Short) != limit_Trade:
+    limit_Trade_Long = round(limit_Trade / 2)
+    limit_Trade_Short = limit_Trade - limit_Trade_Long
+
 Not_Trade = get_float('setting', 'not_trade', 10.0)
+
 TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
 # TP = get_float('setting', 'tp_rate')
 TP_Long = get_float('setting', 'tp_long', 10.0)

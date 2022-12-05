@@ -23,7 +23,8 @@ auto_min_cost = off
 cost_type = $
 cost_amount = 1.5
 
-limit_trade = 10
+limit_trade_long = 5
+limit_trade_short = 5
 not_trade = 10.0
 
 tpsl_mode = on
