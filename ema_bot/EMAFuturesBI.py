@@ -63,30 +63,8 @@ UB_TIMER_SECONDS = [
     int(TIMEFRAME_SECONDS[config.timeframe]/2)
 ]
 
-# ----------------------------------------------------------------------------
-# global variable
-# ----------------------------------------------------------------------------
-notify = LineNotify(config.LINE_NOTIFY_TOKEN)
-
-all_positions = pd.DataFrame(columns=["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"])
-# count_trade = 0
-count_trade_long = 0
-count_trade_short = 0
-
-start_balance_total = 0.0
-balance_entry = 0.0
-balalce_total = 0.0
-
-watch_list = []
-all_symbols = {}
-all_leverage = {}
-all_candles = {}
-
-orders_history = {}
-
-RSI30 = [30 for i in range(0, CANDLE_PLOT)]
-RSI50 = [50 for i in range(0, CANDLE_PLOT)]
-RSI70 = [70 for i in range(0, CANDLE_PLOT)]
+POSITION_COLUMNS = ["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"]
+# POSITION_COLUMNS = ["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"]
 
 CSV_COLUMNS = [
         "symbol", "signal_index", "margin_type",
@@ -106,6 +84,32 @@ CSV_COLUMNS = [
         "slow_type",
         "slow_value"
         ]
+
+# ----------------------------------------------------------------------------
+# global variable
+# ----------------------------------------------------------------------------
+notify = LineNotify(config.LINE_NOTIFY_TOKEN)
+
+all_positions = pd.DataFrame(columns=POSITION_COLUMNS)
+# count_trade = 0
+count_trade_long = 0
+count_trade_short = 0
+
+start_balance_total = 0.0
+balance_entry = 0.0
+balalce_total = 0.0
+
+watch_list = []
+all_symbols = {}
+all_leverage = {}
+all_candles = {}
+
+orders_history = {}
+
+RSI30 = [30 for i in range(0, CANDLE_PLOT)]
+RSI50 = [50 for i in range(0, CANDLE_PLOT)]
+RSI70 = [70 for i in range(0, CANDLE_PLOT)]
+
 symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
 
 async def line_chart(symbol, df, msg, pd=''):
@@ -595,16 +599,13 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 callbackLong = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_long'].split(',')][0]
                 activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
 
-            # print(symbol, 'isBullish')
-            # print(symbol, tradeMode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-            # print(f'{symbol:12} LONG  {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} LONG')
             if tradeMode == 'on' and config.limit_Trade_Long > count_trade_long and balance_entry > config.Not_Trade:
                 count_trade_long = count_trade_long + 1
                 # count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
-                balance_entry -= (amount * priceEntry / leverage)
+                balance_entry = balance_entry - (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
@@ -645,16 +646,13 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 callbackShort = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_short'].split(',')][0]
                 activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
 
-            # print(symbol, 'isBearish')
-            # print(symbol, tradeMode, limitTrade, count_trade, balance_entry, config.Not_Trade, priceEntry, amount)
-            # print(f'{symbol:12} SHORT {count_trade} {balance_entry:-10.2f} {priceEntry:-10.4f} {amount:-10.4f}')
             print(f'{symbol:12} SHORT')
             if tradeMode == 'on' and config.limit_Trade_Short > count_trade_short and balance_entry > config.Not_Trade:
                 count_trade_short = count_trade_short + 1
                 # count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
-                balance_entry -= (amount * priceEntry / leverage)
+                balance_entry = balance_entry - (amount * priceEntry / leverage)
                 print('balance_entry', balance_entry)
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
@@ -983,21 +981,18 @@ async def update_all_balance(marginType, checkMM=True):
         sumProfit = sum([float(position['unrealizedProfit']) for position in positions])
         sumMargin = sum([float(position['initialMargin']) for position in positions])
 
-        all_positions = pd.DataFrame(positions,
-            columns=["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"])
+        all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
         all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
         count_trade = len(all_positions)
         count_trade_long = sum(all_positions["pd."].map(lambda x : x == 'LONG'))
         count_trade_short = sum(all_positions["pd."].map(lambda x : x == 'SHORT'))
         freeBalance =  await exchange.fetch_free_balance()
         balance_entry = float(freeBalance[marginType])
-        # sumProfit = pd.Series(all_positions['unrealizedProfit'].apply(lambda x: float(x))).sum()
-        # sumMargin = pd.Series(all_positions['initialMargin'].apply(lambda x: float(x))).sum()
 
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.2f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
-        balalce_total = balance_entry+sumMargin+sumProfit
-        balance_change = balalce_total-start_balance_total if start_balance_total > 0 else 0
+        balalce_total = balance_entry + sumMargin + sumProfit
+        balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
