@@ -115,7 +115,7 @@ async def line_chart(symbol, df, msg, pd='', **kwargs):
     # colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
     added_plots = [
         mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue',width=0.75,
-            fill_between=dict(y1=30, y2=70, color="#F1B595"),ylabel=f"RSI ({config.RSI_PERIOD})"),
+            fill_between=dict(y1=kwargs['RSIlo'], y2=kwargs['RSIhi'], color="#F1B595"),ylabel=f"RSI ({config.RSI_PERIOD})"),
         mpf.make_addplot(RSIlo,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
         mpf.make_addplot(RSIhi,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
         mpf.make_addplot(data['ADX'],ylim=(0, 90),panel=3,color='red',width=0.75,ylabel=f"ADX ({config.ADXPeriod})"),
