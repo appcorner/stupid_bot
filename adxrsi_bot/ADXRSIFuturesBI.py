@@ -616,7 +616,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
 
             print(f'{symbol:12} SHORT')
-            if tradeMode == 'on' and config.limit_Trade_Long > count_trade_short and balance_entry > config.Not_Trade:
+            if tradeMode == 'on' and config.limit_Trade_Short > count_trade_short and balance_entry > config.Not_Trade:
                 count_trade_short = count_trade_short + 1
                 # count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
