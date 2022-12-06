@@ -436,7 +436,14 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade_long, count_trade_short
 
     # delay เพื่อให้กระจายการ trade ของ symbol มากขึ้น
-    delay = randint(1,5)
+    delay = randint(5,10)
+    # จัดลำดับการ trade symbol
+    if symbol in orders_history.keys:
+        winRate = orders_history[symbol]['win']/orders_history[symbol]['trade']
+        if winRate > 0.5:
+            delay = 0
+        elif winRate == 0.5:
+             delay = 4
     await sleep(delay)
 
     # อ่านข้อมูลแท่งเทียนที่เก็บไว้ใน all_candles
