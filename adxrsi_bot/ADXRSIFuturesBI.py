@@ -1147,7 +1147,7 @@ if __name__ == "__main__":
         logger = logging.getLogger("App Log")
         logger.setLevel(config.LOG_LEVEL)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        handler = RotatingFileHandler('app.log', maxBytes=200000, backupCount=5)
+        handler = RotatingFileHandler('./logs/app.log', maxBytes=200000, backupCount=5)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
