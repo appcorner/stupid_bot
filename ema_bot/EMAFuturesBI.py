@@ -20,7 +20,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4.5'
+bot_name = 'EMA Futures (Binance) version 1.4.6'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -91,7 +91,7 @@ CSV_COLUMNS = [
 notify = LineNotify(config.LINE_NOTIFY_TOKEN)
 
 all_positions = pd.DataFrame(columns=POSITION_COLUMNS)
-# count_trade = 0
+count_trade = 0
 count_trade_long = 0
 count_trade_short = 0
 
@@ -111,6 +111,17 @@ RSI50 = [50 for i in range(0, CANDLE_PLOT)]
 RSI70 = [70 for i in range(0, CANDLE_PLOT)]
 
 symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
+
+def getExchange():
+    exchange = ccxt.binance({
+        "apiKey": config.API_KEY,
+        "secret": config.API_SECRET,
+        "options": {"defaultType": "future"},
+        "enableRateLimit": True}
+    )
+    if config.SANDBOX:
+        exchange.set_sandbox_mode(True)
+    return exchange
 
 async def line_chart(symbol, df, msg, pd=''):
     data = df.tail(CANDLE_PLOT)
@@ -414,6 +425,7 @@ async def cancel_order(exchange, symbol):
 #-------------------------------------------------------------------------------
 async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
     closetp=(closeRate/100.0)
+    logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeamt:{amount*closetp}')
     params = {
         'reduceOnly': True
     }
@@ -442,6 +454,7 @@ async def long_TLSTOP(exchange, symbol, amount: float, priceTL: float, callbackR
 #-------------------------------------------------------------------------------
 async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
     closetp=(closeRate/100.0)
+    logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeamt:{amount*closetp}')
     params = {
         'quantityIsRequired': False, 
         'reduceOnly': True
@@ -496,7 +509,7 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
     return (float(priceEntry), float(amount))
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
-    global all_positions, balance_entry, count_trade_long, count_trade_short
+    global all_positions, balance_entry, count_trade, count_trade_long, count_trade_short
 
     # delay เพื่อให้กระจายการ trade ของ symbol มากขึ้น
     delay = randint(5,10)
@@ -574,6 +587,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         if tradeMode == 'on' and isShortExit == True and hasShortPosition == True:
             count_trade_short = count_trade_short - 1 if count_trade_short > 0 else 0
+            count_trade = count_trade_long + count_trade_short
             await short_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Short Exit processing...")
             await cancel_order(exchange, symbol)
@@ -582,13 +596,13 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         elif tradeMode == 'on' and isLongExit == True and hasLongPosition == True:
             count_trade_long = count_trade_long - 1 if count_trade_long > 0 else 0
+            count_trade = count_trade_long + count_trade_short
             await long_close(exchange, symbol, positionAmt)
             print(f"[{symbol}] สถานะ : Long Exit processing...")
             await cancel_order(exchange, symbol)
             # line_notify(f'{symbol}\nสถานะ : Long Exit')
             gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long Exit', 'LONG EXIT') )
 
-        # count_trade = count_trade_long + count_trade_short
         notify_msg = []
         notify_msg.append(symbol)
 
@@ -607,9 +621,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
 
             print(f'{symbol:12} LONG')
-            if tradeMode == 'on' and config.limit_Trade_Long > count_trade_long and balance_entry > config.Not_Trade:
+            if tradeMode == 'on' and balance_entry > config.Not_Trade \
+                and (config.limit_Trade > count_trade or config.limit_Trade_Long > count_trade_long) :
                 count_trade_long = count_trade_long + 1
-                # count_trade = count_trade_long + count_trade_short
+                count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry = balance_entry - (amount * priceEntry / leverage)
@@ -617,22 +632,45 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify_msg.append('สถานะ : Long\nCross Up')
+                notify_msg.append(f'สถานะ : Long\nCross Up\nราคา : {priceEntry:.5f}')
 
                 logger.debug(f'{symbol} LONG\n{df.tail(3)}')
             
-                if TPSLMode =='on':
-                    pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
-                    pricesl = priceEntry - (priceEntry * (SLLong / 100.0))
-                    await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseLong)
-                    print(f'[{symbol}] Set TP {pricetp:.4f} SL {pricesl:.4f}')
-                    notify_msg.append(f'# TPSL\nTP: {TPLong:.2f}%\nTP close: {TPCloseLong:.2f}%\nSL: {SLLong:.2f}%')
-                if trailingStopMode =='on':
-                    priceTL = priceEntry +(priceEntry * (activeTLLong / 100.0))
+                closeRate = 100.0
+                if TPSLMode == 'on':
+                    notify_msg.append(f'# TPSL')
+                    if config.TP_PNL > 0 or config.TP_PNL_Long > 0:
+                        if config.TP_PNL_Long > 0:
+                            pricetp = priceEntry + (config.TP_PNL_Long / amount)
+                            notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}')
+                        else:
+                            pricetp = priceEntry + (config.TP_PNL / amount)
+                            notify_msg.append(f'TP PNL: {config.TP_PNL:.2f} @{pricetp:.5f}')
+                    else:
+                        closeRate = TPCloseLong
+                        pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
+                        notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp:.5f}')
+                    notify_msg.append(f'TP close: {closeRate:.2f}%')
+                    if config.SL_PNL > 0 or config.SL_PNL_Long > 0:
+                        if config.SL_PNL_Long > 0:
+                            pricesl = priceEntry - (config.SL_PNL_Long / amount)
+                            notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
+                        else:
+                            pricesl = priceEntry - (config.SL_PNL / amount)
+                            notify_msg.append(f'SL PNL: {config.SL_PNL:.2f} @{pricesl:.5f}')
+                    else:
+                        pricesl = priceEntry - (priceEntry * (SLLong / 100.0))
+                        notify_msg.append(f'SL: {SLLong:.2f}% @{pricesl:.5f}')
+
+                    await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
+                    print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
+                    
+                if trailingStopMode == 'on' and closeRate < 100.0:
+                    priceTL = priceEntry + (priceEntry * (activeTLLong / 100.0))
                     await long_TLSTOP(exchange, symbol, amount, priceTL, callbackLong)
                     print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
                     # callbackLong_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackLong])
-                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: {round(priceTL,5):.4f} {config.MarginType}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: {priceTL:.4f} {config.MarginType}')
 
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG') )
                 
@@ -654,9 +692,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
 
             print(f'{symbol:12} SHORT')
-            if tradeMode == 'on' and config.limit_Trade_Short > count_trade_short and balance_entry > config.Not_Trade:
+            if tradeMode == 'on' and balance_entry > config.Not_Trade \
+                and (config.limit_Trade > count_trade or config.limit_Trade_Short > count_trade_short) :
                 count_trade_short = count_trade_short + 1
-                # count_trade = count_trade_long + count_trade_short
+                count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
                 balance_entry = balance_entry - (amount * priceEntry / leverage)
@@ -664,22 +703,45 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify_msg.append('สถานะ : Short\nCross Down')
+                notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry:.5f}')
 
                 logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
             
+                closeRate = 100.0
                 if TPSLMode == 'on':
-                    pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
-                    pricesl = priceEntry + (priceEntry * (SLShort / 100.0))
-                    await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, TPCloseShort)
-                    print(f'[{symbol}] Set TP {pricetp:.4f} SL {pricesl:.4f}')
-                    notify_msg.append(f'# TPSL\nTP: {TPShort:.2f}%\nTP close: {TPCloseShort:.2f}%\nSL: {SLShort:.2f}%')
-                if trailingStopMode == 'on':
-                    priceTL = priceEntry - (priceEntry * (activeTLShort / 100.0))
+                    notify_msg.append(f'# TPSL')
+                    if config.TP_PNL > 0 or config.TP_PNL_Short > 0:
+                        if config.TP_PNL_Short > 0:
+                            pricetp = priceEntry - (config.TP_PNL_Short / amount)
+                            notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}')
+                        else:
+                            pricetp = priceEntry - (config.TP_PNL / amount)
+                            notify_msg.append(f'TP PNL: {config.TP_PNL:.2f} @{pricetp:.5f}')
+                    else:
+                        closeRate = TPCloseShort
+                        pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
+                        notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp:.5f}')
+                    notify_msg.append(f'TP close: {closeRate:.2f}%')
+                    if config.SL_PNL > 0 or config.SL_PNL_Short > 0:
+                        if config.SL_PNL_Short > 0:
+                            pricesl = priceEntry + (config.SL_PNL_Short / amount)
+                            notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl:.5f}')
+                        else:
+                            pricesl = priceEntry + (config.SL_PNL / amount)
+                            notify_msg.append(f'SL PNL: {config.SL_PNL:.2f} @{pricesl:.5f}')
+                    else:
+                        pricesl = priceEntry + (priceEntry * (SLShort / 100.0))
+                        notify_msg.append(f'SL: {SLShort:.2f}% @{pricesl:.5f}')
+
+                    await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
+                    print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
+
+                if trailingStopMode == 'on' and closeRate < 100.0:
+                    priceTL = priceEntry - ((activeTLShort / 100.0) / amount)
                     await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
                     print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
                     # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
-                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: {round(priceTL,5):.4f} {config.MarginType}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: {priceTL:.5f} {config.MarginType}')
  
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT') )
 
@@ -694,12 +756,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 async def load_all_symbols():
     global all_symbols, watch_list
     try:
-        exchange = ccxt.binance({
-            "apiKey": config.API_KEY,
-            "secret": config.API_SECRET,
-            "options": {"defaultType": "future"},
-            "enableRateLimit": True}
-        )
+        exchange = getExchange()
 
         # t1=time.time()
         markets = await exchange.fetch_markets()
@@ -740,12 +797,7 @@ async def load_all_symbols():
 
 async def set_all_leverage():
     try:
-        exchange = ccxt.binance({
-            "apiKey": config.API_KEY,
-            "secret": config.API_SECRET,
-            "options": {"defaultType": "future"},
-            "enableRateLimit": True}
-        )
+        exchange = getExchange()
 
         # set leverage
         loops = [set_leverage(exchange, symbol, config.MarginType) for symbol in watch_list]
@@ -765,12 +817,7 @@ async def set_all_leverage():
 
 async def fetch_first_ohlcv():
     try:
-        exchange = ccxt.binance({
-            "apiKey": config.API_KEY,
-            "secret": config.API_SECRET,
-            "options": {"defaultType": "future"},
-            "enableRateLimit": True}
-        )
+        exchange = getExchange()
 
         # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
         limit = CANDLE_LIMIT
@@ -793,12 +840,7 @@ async def fetch_first_ohlcv():
 
 async def fetch_next_ohlcv(next_ticker):
     try:
-        exchange = ccxt.binance({
-            "apiKey": config.API_KEY,
-            "secret": config.API_SECRET,
-            "options": {"defaultType": "future"},
-            "enableRateLimit": True}
-        )
+        exchange = getExchange()
 
         # กำหนด limit การอ่านแท่งเทียนแบบ 0=ไม่ระบุจำนวน, n=จำนวน n แท่ง
         limit = 0
@@ -823,13 +865,13 @@ async def mm_strategy(exchange, mm_positions):
 
         # Money Management (MM) Strategy
         logger.debug(f'Profit: Long[{sumLongProfit}] + Short[{sumShortProfit}] = All[{sumProfit}]')
-        logger.debug(f'All: {config.TP_IfAllProfit_Gt}, {config.SL_IfAllProfit_Lt}')
-        logger.debug(f'Long: {config.TP_IfLongProfit_Gt}, {config.SL_IfLongProfit_Lt}')
-        logger.debug(f'Short: {config.TP_IfShortProfit_Gt}, {config.SL_IfShortProfit_Lt}')
-        logger.debug(f'PNL: {config.TP_IfPNL_Gt}, {config.SL_IfPNL_Lt}')
+        logger.debug(f'All: {config.TP_Profit}, {config.SL_Profit}')
+        logger.debug(f'Long: {config.TP_Profit_Long}, {config.SL_Profit_Long}')
+        logger.debug(f'Short: {config.TP_Profit_Short}, {config.SL_Profit_Short}')
+        # logger.debug(f'PNL: {config.TP_PNL}, {config.SL_PNL}')
 
-        if (config.TP_IfAllProfit_Gt > 0 and sumProfit > config.TP_IfAllProfit_Gt) or \
-            (config.SL_IfAllProfit_Lt < 0 and sumProfit < config.SL_IfAllProfit_Lt):
+        if (config.TP_Profit > 0 and sumProfit > config.TP_Profit) or \
+            (config.SL_Profit > 0 and sumProfit < -config.SL_Profit):
 
             exit_loops = []
             cancel_loops = []
@@ -858,10 +900,10 @@ async def mm_strategy(exchange, mm_positions):
         
         else:
 
-            isTPLongExit = (config.TP_IfLongProfit_Gt > 0 and sumLongProfit > config.TP_IfLongProfit_Gt)
-            isSLLongExit = (config.SL_IfLongProfit_Lt < 0 and sumLongProfit < config.SL_IfLongProfit_Lt)
-            isTPShortExit = (config.TP_IfShortProfit_Gt > 0 and sumShortProfit > config.TP_IfShortProfit_Gt)
-            isSLShortExit = (config.SL_IfShortProfit_Lt < 0 and sumShortProfit < config.SL_IfShortProfit_Lt)
+            isTPLongExit = (config.TP_Profit_Long > 0 and sumLongProfit > config.TP_Profit_Long)
+            isSLLongExit = (config.SL_Profit_Long > 0 and sumLongProfit < -config.SL_Profit_Long)
+            isTPShortExit = (config.TP_Profit_Short > 0 and sumShortProfit > config.TP_Profit_Short)
+            isSLShortExit = (config.SL_Profit_Short > 0 and sumShortProfit < -config.SL_Profit_Short)
 
             if isTPLongExit or isSLLongExit:
                 exit_loops = []
@@ -904,51 +946,6 @@ async def mm_strategy(exchange, mm_positions):
                     txt_notify = '\n'.join(mm_notify)
                     line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
                 logger.debug(mm_positions)
-        
-            # exit position if PNL 
-            if config.TP_IfPNL_Gt > 0:
-                tp_lists = [position for position in mm_positions if float(position['unrealizedProfit']) > config.TP_IfPNL_Gt]
-                if len(tp_lists) > 0:
-                    exit_loops = []
-                    cancel_loops = []
-                    for position in tp_lists:
-                        symbol = position['symbol']
-                        positionAmt = float(position['positionAmt'])
-                        unrealizedProfit = float(position['unrealizedProfit'])
-                        if positionAmt > 0.0 and not isTPLongExit:
-                            print(f"[{symbol}] สถานะ : MM Long Exit processing...")
-                            exit_loops.append(long_close(exchange, symbol, positionAmt))
-                            line_notify(f'{symbol}\nสถานะ : MM Long Exit\nPNL = {unrealizedProfit}')
-                        elif positionAmt < 0.0 and not isTPShortExit:
-                            print(f"[{symbol}] สถานะ : MM Short Exit processing...")
-                            exit_loops.append(short_close(exchange, symbol, positionAmt))
-                            line_notify(f'{symbol}\nสถานะ : MM Short Exit\nPNL = {unrealizedProfit}')
-                        cancel_loops.append(cancel_order(exchange, symbol))
-                    await gather(*exit_loops)
-                    await gather(*cancel_loops)
-                    logger.debug(tp_lists)
-
-            if config.SL_IfPNL_Lt < 0:
-                sl_lists = [position for position in mm_positions if float(position['unrealizedProfit']) < config.SL_IfPNL_Lt]
-                if len(sl_lists) > 0:
-                    exit_loops = []
-                    cancel_loops = []
-                    for position in sl_lists:
-                        symbol = position['symbol']
-                        positionAmt = float(position['positionAmt'])
-                        unrealizedProfit = float(position['unrealizedProfit'])
-                        if positionAmt > 0.0 and not isSLLongExit:
-                            print(f"[{symbol}] สถานะ : MM Long Exit processing...")
-                            exit_loops.append(long_close(exchange, symbol, positionAmt))
-                            line_notify(f'{symbol}\nสถานะ : MM Long Exit\nPNL = {unrealizedProfit}')
-                        elif positionAmt < 0.0 and not isSLShortExit:
-                            print(f"[{symbol}] สถานะ : MM Short Exit processing...")
-                            exit_loops.append(short_close(exchange, symbol, positionAmt))
-                            line_notify(f'{symbol}\nสถานะ : MM Short Exit\nPNL = {unrealizedProfit}')
-                        cancel_loops.append(cancel_order(exchange, symbol))
-                    await gather(*exit_loops)
-                    await gather(*cancel_loops)
-                    logger.debug(sl_lists)
 
         #loss conter
         if config.Loss_Limit > 0:
@@ -963,14 +960,9 @@ async def mm_strategy(exchange, mm_positions):
         logger.exception('mm_strategy')
 
 async def update_all_balance(marginType, checkMM=True):
-    global all_positions, balance_entry, balalce_total, count_trade_long, count_trade_short, orders_history
+    global all_positions, balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, orders_history
     try:
-        exchange = ccxt.binance({
-            "apiKey": config.API_KEY,
-            "secret": config.API_SECRET,
-            "options": {"defaultType": "future"},
-            "enableRateLimit": True}
-        )
+        exchange = getExchange()
 
         balance = await exchange.fetch_balance()
         ex_positions = balance['info']['positions']
@@ -1003,7 +995,10 @@ async def update_all_balance(marginType, checkMM=True):
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
-            print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
+            if config.limit_Trade > 0:
+                print(f"Count Trade ===== {count_trade}/{config.limit_Trade}")
+            else:
+                print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
             print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.4f} Profit: {sumProfit:+,.4f}")
             print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
                 
@@ -1068,12 +1063,7 @@ async def load_symbols_setting():
 
 async def close_non_position_order(watch_list, positions_list):
     try:
-        exchange = ccxt.binance({
-            "apiKey": config.API_KEY,
-            "secret": config.API_SECRET,
-            "options": {"defaultType": "future"},
-            "enableRateLimit": True}
-        )
+        exchange = getExchange()
 
         loops = [cancel_order(exchange, symbol) for symbol in watch_list if symbol not in positions_list]
         await gather(*loops)
@@ -1088,7 +1078,10 @@ async def close_non_position_order(watch_list, positions_list):
 async def main():
     global start_balance_total
 
-    bot_title = f'{bot_name} - {config.timeframe} - {config.MarginType}'
+    if config.SANDBOX:
+        bot_title = f'{bot_name} - {config.timeframe} - {config.MarginType} (SANDBOX)'
+    else:
+        bot_title = f'{bot_name} - {config.timeframe} - {config.MarginType}'
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_title)

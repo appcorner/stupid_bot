@@ -74,6 +74,7 @@ config.readfp(config_file)
 #------------------------------------------------------------
 API_KEY = get_str('binance','api_key')
 API_SECRET = get_str('binance','api_secret')
+SANDBOX = (get_str('binance','sandbox', 'off') == 'on')
 
 #------------------------------------------------------------
 # line
@@ -114,12 +115,14 @@ Leverage = get_int('setting', 'leverage', 20)
 CostType = get_str('setting', 'cost_type', '$')
 CostAmount = get_float('setting', 'cost_amount', 1.5)
 
-limit_Trade_Long = get_int('setting', 'limit_trade_long', 5)
-limit_Trade_Short = get_int('setting', 'limit_trade_short', 5)
-limit_Trade = get_int('setting', 'limit_trade', limit_Trade_Long+limit_Trade_Short)
-if (limit_Trade_Long + limit_Trade_Short) != limit_Trade:
-    limit_Trade_Long = round(limit_Trade / 2)
-    limit_Trade_Short = limit_Trade - limit_Trade_Long
+limit_Trade = get_int('setting', 'limit_trade', 10)
+if is_exist('setting', 'limit_trade') and limit_Trade != 0:
+    limit_Trade_Long = 0 # no limit
+    limit_Trade_Short = 0 # no limit
+else:
+    limit_Trade_Long = get_int('setting', 'limit_trade_long', 5)
+    limit_Trade_Short = get_int('setting', 'limit_trade_short', 5)
+    limit_Trade = 0 # no limit
 
 Not_Trade = get_float('setting', 'not_trade', 10.0)
 
@@ -143,6 +146,12 @@ SL_Short = get_float('setting', 'sl_short', 4.0)
 Trailing_Stop_Mode = get_str('setting', 'trailing_stop_mode', 'on')
 
 Callback = get_float('setting', 'callback', 5.0)
+if Callback > 5.0:
+    print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
+    Callback = 5.0
+elif Callback < 0.1:
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.1%')
+    Callback = 0.1
 Callback_Long = [Callback]
 Callback_Short = [Callback]
 if is_exist('setting', 'callback_long'):
@@ -172,16 +181,18 @@ RSI_PERIOD = get_int('setting', 'rsi_period')
 
 CSV_NAME = get_str('symbols_setting', 'csv_name', None)
 
-TP_IfPNL_Gt = get_float('mm', 'tp_if_pnl_gt', 0.0)
-SL_IfPNL_Lt = get_float('mm', 'sl_if_pnl_lt', 0.0)
+TP_PNL = get_float('mm', 'tp_pnl', 0.0)
+SL_PNL = get_float('mm', 'sl_pnl', 0.0)
+TP_PNL_Long = get_float('mm', 'tp_pnl_long', 0.0)
+SL_PNL_Long = get_float('mm', 'sl_pnl_long', 0.0)
+TP_PNL_Short = get_float('mm', 'tp_pnl_short', 0.0)
+SL_PNL_Short = get_float('mm', 'sl_pnl_short', 0.0)
 
-TP_IfAllProfit_Gt = get_float('mm', 'tp_if_all_profit_gt', 0.0)
-SL_IfAllProfit_Lt = get_float('mm', 'sl_if_all_profit_lt', 0.0)
-
-TP_IfLongProfit_Gt = get_float('mm', 'tp_if_long_profit_gt', 0.0)
-SL_IfLongProfit_Lt = get_float('mm', 'sl_if_long_profit_lt', 0.0)
-
-TP_IfShortProfit_Gt = get_float('mm', 'tp_if_short_profit_gt', 0.0)
-SL_IfShortProfit_Lt = get_float('mm', 'sl_if_short_profit_lt', 0.0)
+TP_Profit = get_float('mm', 'tp_profit', 0.0)
+SL_Profit = get_float('mm', 'sl_profit', 0.0)
+TP_Profit_Long = get_float('mm', 'tp_profit_long', 0.0)
+SL_Profit_Long = get_float('mm', 'sl_profit_long', 0.0)
+TP_Profit_Short = get_float('mm', 'tp_profit_short', 0.0)
+SL_Profit_Short = get_float('mm', 'sl_profit_short', 0.0)
 
 Loss_Limit = get_int('mm', 'loss_limit', 0)
