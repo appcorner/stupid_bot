@@ -265,7 +265,7 @@ def add_indicator(symbol, bars):
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.exception('add_indicator')
+        logger.exception(f'add_indicator {symbol}')
 
     return df
 
@@ -292,7 +292,7 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             # print(symbol)
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.exception('fetch_ohlcv')
+        logger.exception(f'fetch_ohlcv {symbol}')
         if limit == 0 and symbol in all_candles.keys():
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
 
@@ -608,16 +608,16 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         if isLongEnter == True and config.Long == 'on' and hasLongPosition == False:
             TPLong = config.TP_Long
-            TPCloseLong = config.TPclose_Long
+            TPCloseLong = config.TP_Close_Long
             SLLong = config.SL_Long
-            callbackLong = config.Callback_Long[0]
+            callbackLong = config.Callback_Long
             activeTLLong = config.Active_TL_Long
             if symbol in symbols_setting.index:
                 TPLong = float(symbols_setting.loc[symbol]['tp_long'])
                 TPCloseLong = float(symbols_setting.loc[symbol]['tp_close_long'])
                 SLLong = float(symbols_setting.loc[symbol]['sl_long'])
-                # callbackLong = float(symbols_setting.loc[symbol]['callback_long'])
-                callbackLong = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_long'].split(',')][0]
+                callbackLong = float(symbols_setting.loc[symbol]['callback_long'])
+                # callbackLong = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_long'].split(',')][0]
                 activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
 
             print(f'{symbol:12} LONG')
@@ -637,27 +637,24 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 logger.debug(f'{symbol} LONG\n{df.tail(3)}')
             
                 closeRate = 100.0
+                priceTL = 0.0
                 if TPSLMode == 'on':
                     notify_msg.append(f'# TPSL')
-                    if config.TP_PNL > 0 or config.TP_PNL_Long > 0:
-                        if config.TP_PNL_Long > 0:
-                            pricetp = priceEntry + (config.TP_PNL_Long / amount)
-                            notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}')
-                        else:
-                            pricetp = priceEntry + (config.TP_PNL / amount)
-                            notify_msg.append(f'TP PNL: {config.TP_PNL:.2f} @{pricetp:.5f}')
+                    if config.TP_PNL_Long > 0:
+                        closeRate = config.TP_PNL_Close_Long
+                        pricetp = priceEntry + (config.TP_PNL_Long / amount)
+                        notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}')
+                        priceTL = priceEntry + (config.Active_TL_PNL_Long / amount)
+                        callbackLong = config.Callback_PNL_Long
                     else:
                         closeRate = TPCloseLong
                         pricetp = priceEntry + (priceEntry * (TPLong / 100.0))
                         notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp:.5f}')
+                        priceTL = priceEntry + (priceEntry * (activeTLLong / 100.0))
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
-                    if config.SL_PNL > 0 or config.SL_PNL_Long > 0:
-                        if config.SL_PNL_Long > 0:
-                            pricesl = priceEntry - (config.SL_PNL_Long / amount)
-                            notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
-                        else:
-                            pricesl = priceEntry - (config.SL_PNL / amount)
-                            notify_msg.append(f'SL PNL: {config.SL_PNL:.2f} @{pricesl:.5f}')
+                    if config.SL_PNL_Long > 0:
+                        pricesl = priceEntry - (config.SL_PNL_Long / amount)
+                        notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
                     else:
                         pricesl = priceEntry - (priceEntry * (SLLong / 100.0))
                         notify_msg.append(f'SL: {SLLong:.2f}% @{pricesl:.5f}')
@@ -665,12 +662,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
                     print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
                     
-                if trailingStopMode == 'on' and closeRate < 100.0:
-                    priceTL = priceEntry + (priceEntry * (activeTLLong / 100.0))
+                if trailingStopMode == 'on' and closeRate < 100.0 and priceTL > 0.0:
                     await long_TLSTOP(exchange, symbol, amount, priceTL, callbackLong)
                     print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
                     # callbackLong_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackLong])
-                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: {priceTL:.4f} {config.MarginType}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: {priceTL:.4f}')
 
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG') )
                 
@@ -679,16 +675,16 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         elif isShortEnter == True and config.Short == 'on' and hasShortPosition == False:
             TPShort = config.TP_Short
-            TPCloseShort = config.TPclose_Short
+            TPCloseShort = config.TP_Close_Short
             SLShort = config.SL_Short
-            callbackShort = config.Callback_Short[0]
+            callbackShort = config.Callback_Short
             activeTLShort = config.Active_TL_Short
             if symbol in symbols_setting.index:
                 TPShort = float(symbols_setting.loc[symbol]['tp_short'])
                 TPCloseShort = float(symbols_setting.loc[symbol]['tp_close_short'])
                 SLShort = float(symbols_setting.loc[symbol]['sl_short'])
-                # callbackShort = float(symbols_setting.loc[symbol]['callback_short'])
-                callbackShort = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_short'].split(',')][0]
+                callbackShort = float(symbols_setting.loc[symbol]['callback_short'])
+                # callbackShort = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_short'].split(',')][0]
                 activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
 
             print(f'{symbol:12} SHORT')
@@ -708,27 +704,24 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
             
                 closeRate = 100.0
+                priceTL = 0.0
                 if TPSLMode == 'on':
                     notify_msg.append(f'# TPSL')
-                    if config.TP_PNL > 0 or config.TP_PNL_Short > 0:
-                        if config.TP_PNL_Short > 0:
-                            pricetp = priceEntry - (config.TP_PNL_Short / amount)
-                            notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}')
-                        else:
-                            pricetp = priceEntry - (config.TP_PNL / amount)
-                            notify_msg.append(f'TP PNL: {config.TP_PNL:.2f} @{pricetp:.5f}')
+                    if config.TP_PNL_Short > 0:
+                        closeRate = config.TP_PNL_Close_Short
+                        pricetp = priceEntry - (config.TP_PNL_Short / amount)
+                        notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}')
+                        priceTL = priceEntry - (config.Active_TL_PNL_Short / amount)
+                        callbackShort = config.Callback_PNL_Short
                     else:
                         closeRate = TPCloseShort
                         pricetp = priceEntry - (priceEntry * (TPShort / 100.0))
                         notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp:.5f}')
+                        priceTL = priceEntry - (priceEntry * (activeTLShort / 100.0))
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
-                    if config.SL_PNL > 0 or config.SL_PNL_Short > 0:
-                        if config.SL_PNL_Short > 0:
-                            pricesl = priceEntry + (config.SL_PNL_Short / amount)
-                            notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl:.5f}')
-                        else:
-                            pricesl = priceEntry + (config.SL_PNL / amount)
-                            notify_msg.append(f'SL PNL: {config.SL_PNL:.2f} @{pricesl:.5f}')
+                    if config.SL_PNL_Short > 0:
+                        pricesl = priceEntry + (config.SL_PNL_Short / amount)
+                        notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl:.5f}')
                     else:
                         pricesl = priceEntry + (priceEntry * (SLShort / 100.0))
                         notify_msg.append(f'SL: {SLShort:.2f}% @{pricesl:.5f}')
@@ -736,12 +729,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
                     print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
 
-                if trailingStopMode == 'on' and closeRate < 100.0:
-                    priceTL = priceEntry - ((activeTLShort / 100.0) / amount)
+                if trailingStopMode == 'on' and closeRate < 100.0 and priceTL > 0.0:
                     await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
                     print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
                     # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
-                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: {priceTL:.5f} {config.MarginType}')
+                    notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: {priceTL:.5f}')
  
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT') )
 
@@ -750,7 +742,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.exception('go_trade')
+        logger.exception(f'go_trade {symbol}')
         pass
 
 async def load_all_symbols():
@@ -833,7 +825,7 @@ async def fetch_first_ohlcv():
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
-        logger.exception('set_all_leverage')
+        logger.exception('fetch_first_ohlcv')
 
     finally:
         await exchange.close()
@@ -856,8 +848,13 @@ async def fetch_next_ohlcv(next_ticker):
     finally:
         await exchange.close()
 
-async def mm_strategy(exchange, mm_positions):
+async def mm_strategy(exchange, marginType):
     try:
+        balance = await exchange.fetch_balance()
+        ex_positions = balance['info']['positions']
+        mm_positions = [position for position in ex_positions 
+            if position['symbol'].endswith(marginType) and float(position['positionAmt']) != 0]
+
         # sumProfit = sum([float(position['unrealizedProfit']) for position in mm_positions])
         sumLongProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) >= 0])
         sumShortProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) < 0])
@@ -896,7 +893,6 @@ async def mm_strategy(exchange, mm_positions):
             if len(mm_notify) > 0:
                 txt_notify = '\n'.join(mm_notify)
                 line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
-            logger.debug(mm_positions)
         
         else:
 
@@ -924,7 +920,6 @@ async def mm_strategy(exchange, mm_positions):
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
                     line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
-                logger.debug(mm_positions)
 
             if isTPShortExit or isSLShortExit:
                 exit_loops = []
@@ -945,7 +940,34 @@ async def mm_strategy(exchange, mm_positions):
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
                     line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
-                logger.debug(mm_positions)
+
+        # clear margin = 0.0
+        exit_loops = []
+        cancel_loops = []
+        mm_notify = []
+        # exit all positions
+        for position in mm_positions:
+            symbol = position['symbol']
+            initialMargin = float(position['initialMargin'])
+            if initialMargin <= 0.01:
+                print('remove',symbol, initialMargin)
+                positionAmt = float(position['positionAmt'])
+                if positionAmt > 0.0:
+                    print(f"[{symbol}] สถานะ : MM Long Exit processing...")
+                    exit_loops.append(long_close(exchange, symbol, positionAmt))
+                    # line_notify(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
+                    mm_notify.append(f'{symbol} : MM Long Remove')
+                elif positionAmt < 0.0:
+                    print(f"[{symbol}] สถานะ : MM Short Exit processing...")
+                    exit_loops.append(short_close(exchange, symbol, positionAmt))
+                    # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
+                    mm_notify.append(f'{symbol} : MM Short Remove')
+                cancel_loops.append(cancel_order(exchange, symbol))
+        await gather(*exit_loops)
+        await gather(*cancel_loops)
+        if len(mm_notify) > 0:
+            txt_notify = '\n'.join(mm_notify)
+            line_notify(f'\nสถานะ: Margin <= 0.01\n{txt_notify}')
 
         #loss conter
         if config.Loss_Limit > 0:
@@ -964,14 +986,14 @@ async def update_all_balance(marginType, checkMM=True):
     try:
         exchange = getExchange()
 
+        if checkMM:
+            await mm_strategy(exchange, marginType)
+
         balance = await exchange.fetch_balance()
         ex_positions = balance['info']['positions']
         positions = [position for position in ex_positions 
             if position['symbol'].endswith(marginType) and float(position['positionAmt']) != 0]
 
-        if checkMM:
-            await mm_strategy(exchange, positions)
-        
         # sumLongProfit = sum([float(position['unrealizedProfit']) for position in positions if float(position['positionAmt']) >= 0])
         # sumShortProfit = sum([float(position['unrealizedProfit']) for position in positions if float(position['positionAmt']) < 0])
         # sumProfit = sumLongProfit + sumShortProfit

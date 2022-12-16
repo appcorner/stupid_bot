@@ -7,6 +7,7 @@ open futures order by cross signal between fast and slow indicator
 ## v1.4.6
 - ปรับการปิด position แบบ PNL ใหม่ โดยปรับไปใช้ TP/SL Order แทนการปิด position ด้วยบอท
 - เพิ่ม sandbox mode สำหรับ https://testnet.binancefuture.com
+- ปิด position + order ที่ initialMargin มีค่าน้อยกว่าหรือเท่ากับ 0.01
 
 ## v1.4.5
 - แยกนับ limit position ตาม direction (Long/Short)
@@ -134,15 +135,19 @@ open futures order by cross signal between fast and slow indicator
     ;# ค่าตัวแปรต่างๆ กำหนดค่าเป็น 0 หรือ comment ถ้าต้องการปิดการทำงาน
 
     ;# ตั้ง TP/SL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด
-    ;# ใช้กับทุก positions
-    ;tp_pnl = 0.25
-    ;sl_pnl = 0.07
-    ;# ใช้กับ long position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
-    tp_pnl_long = 0.25
-    sl_pnl_long = 0.07
-    ;# ใช้กับ short position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
-    ;tp_pnl_short = 0.30
-    ;sl_pnl_short = 0.10
+    ;# ใส่ค่าเป็น amount, เฉพาะ close_rate ใส่เป็น %
+    ;# ใช้กับ long position
+    tp_pnl_long = 0.30
+    tp_pnl_close_rate_long = 25.0
+    sl_pnl_long = 0.10
+    active_tl_pnl_long = 0.30
+    callback_pnl_long = 5.0
+    ;# ใช้กับ short position
+    tp_pnl_short = 0.30
+    tp_pnl_close_rate_short = 25.0
+    sl_pnl_short = 0.10
+    active_tl_pnl_short = 0.30
+    callback_pnl_short = 5.0
 
     ;# TP/SL เพื่อปิด positions ทั้งหมด โดยใช้ค่าผลรวมของ profit มาเป็นตัวกำหนด โดยบอทจะทำ TP/SL ตามรอบเวลาที่กำหนดไว้ (default 60 secs)
     ;# ใช้กับทุก positions
