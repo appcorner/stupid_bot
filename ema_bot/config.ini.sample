@@ -8,52 +8,60 @@ sandbox = off
 notify_token = <line notify token>
 
 [app_config]
+;# สามารถข้ามส่วนนี้ไปได้ โดยใช้ค่าที่กำหนดให้ได้เลย
 ;TIME_SHIFT = 5
 ;CANDLE_LIMIT = 1000
 ;CANDLE_PLOT = 100
 ;# level การบันทึก log file ทั่วไปให้ใช้แบบ INFO
 ;# CRITICAL 50, ERROR 40, WARNING 30, INFO 20, DEBUG 10, NOTSET 0
-LOG_LEVEL = 10
+LOG_LEVEL = 20
 ;# กำหนดรอบเวลาในแสดง update balancec และ mm check
 ;# 0=timeframe, 1=15, 2=20, 3=30, 4=60, 5=timeframe/2 
-UB_TIMER_MODE = 3
+UB_TIMER_MODE = 4
 
 [setting]
 ;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d
-timeframe = 1m
+timeframe = 1h
 ;# กำหนดสัญญานที่แท่ง -1 หรือ -2 เท่านั้น, default = -2
 signal_index = -2
+;# กำหนดค่าเป็น USDT, BUSD
 margin_type = USDT
 
-;# ระบุ symbol ที่ต้องการใน watch_list, back_list
-;watch_list = BTCUSDT,DOGEUSDT,GALUSDT,GALAUSDT,IOSTUSDT,MANAUSDT,NEARUSDT,OCEANUSDT,XLMUSDT,XRPUSDT
-;back_list = FTTUSDT
+;# ระบุ symbol ที่ต้องการใน watch_list, back_list และต้องสอดคล้องกับ margin_type
+;watch_list = BTCUSDT,ETHUSDT
+;back_list = SRMUSDT,SOLUSDT,SFPUSDT,FTTUSDT,CVCUSDT,DARUSDT,BNXUSDT
 
+;# กำหนด on/off เพื่อ เปิด/ปิด การทำงาน
 trade_mode = on
 trade_long = on
 trade_short = on
 
+;# กำหนด on/off เพื่อ เปิด/ปิด การทำงาน
 auto_max_leverage = off
 leverage = 20
 ;# กำหนดรูปการคิด cost # $ %
 cost_type = $
-cost_amount = 1.5
+cost_amount = 0.3
 
 ;# กำหนดจำนวน positions ทั้ง long, short รวมกันจะไม่เกิน limit_trade
-limit_trade = 10
+limit_trade = 0
 ;# ถ้ากำหนด limit_trade = 0 จะไปใช้ค่า limit_trade_long และ limit_trade_short แทน
 ;# กำหนดจำนวน positions แยกตาม long, short จะไม่เกิน limit_trade_long และ limit_trade_short
-limit_trade_long = 5
-limit_trade_short = 5
+limit_trade_long = 10
+limit_trade_short = 10
 
 ;# กำหนดจำนวน balance ขั้นต่ำ จะไม่เปิด position ใหม่ ถ้า balance เหลือต่ำกว่า not_trade
 not_trade = 10.0
 
+;# กำหนด on/off สำหรับ TP/SL
 tpsl_mode = on
+;# กำหนด % มูลค่าเหรียญที่จะทำการ take profit, *เมื่อถึงราคาที่กำหนดนี้ จะ TP ที่ราคา market
 tp_long = 10.0
 tp_short = 10.0
+;# กำหนด % close rate ที่ต้องการตอน take profit
 tp_close_long = 50.0
 tp_close_short = 50.0
+;# กำหนด % มูลค่าเหรียญที่จะทำการ stop loss, *เมื่อถึงราคาที่กำหนดนี้ จะ SL ที่ราคา market
 sl_long = 4.0
 sl_short = 4.0
 
@@ -62,11 +70,12 @@ trailing_stop_mode = on
 ;# ค่า callback rate จะต้องอยู่ระหว่าง 0.1 ถึง 5.0
 callback_long = 5.0
 callback_short = 5.0
+;# ค่า active tl ควรตัั้งใกล้เคียงค่า tp
 active_tl_long = 10.0
 active_tl_short = 10.0
 
 ;# กำหนดค่า fast, mid, slow เพื่อให้บอทใช้หาสัญญานในการเปิด position
-;# ระบุ type fast,slow => EMA, SMA, HMA, RMA, WMA, VWMA
+;# ระบุ type fast, mid, slow => EMA, SMA, HMA, RMA, WMA, VWMA
 fast_type = EMA
 fast_value = 8
 mid_type = EMA
@@ -91,12 +100,14 @@ rsi_period = 14
 
 ;# ตั้ง TP/SL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด
 ;# ใส่ค่าเป็น amount, เฉพาะ close_rate ใส่เป็น %
+
 ;# ใช้กับ long position
 tp_pnl_long = 0.30
 tp_pnl_close_rate_long = 25.0
 sl_pnl_long = 0.10
 active_tl_pnl_long = 0.30
 callback_pnl_long = 5.0
+
 ;# ใช้กับ short position
 tp_pnl_short = 0.30
 tp_pnl_close_rate_short = 25.0
@@ -105,12 +116,15 @@ active_tl_pnl_short = 0.30
 callback_pnl_short = 5.0
 
 ;# TP/SL เพื่อปิด positions ทั้งหมด โดยใช้ค่าผลรวมของ profit มาเป็นตัวกำหนด โดยบอทจะทำ TP/SL ตามรอบเวลาที่กำหนดไว้ (default 60 secs)
+
 ;# ใช้กับทุก positions
 ;tp_profit = 1.5
 ;sl_profit = 1.4
+
 ;# ใช้กับ long position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
 tp_profit_long = 3.0
 sl_profit_long = 1.5
+
 ;# ใช้กับ short position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
 tp_profit_short = 3.0
 sl_profit_short = 1.5

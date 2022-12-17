@@ -8,6 +8,7 @@ open futures order by cross signal between fast and slow indicator
 - ปรับการปิด position แบบ PNL ใหม่ โดยปรับไปใช้ TP/SL Order แทนการปิด position ด้วยบอท
 - เพิ่ม sandbox mode สำหรับ https://testnet.binancefuture.com
 - ปิด position + order ที่ initialMargin มีค่าน้อยกว่าหรือเท่ากับ 0.01
+- รวมหรือแยก การนับ limit position ได้
 
 ## v1.4.5
 - แยกนับ limit position ตาม direction (Long/Short)
