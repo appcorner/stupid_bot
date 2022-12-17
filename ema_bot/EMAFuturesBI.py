@@ -848,13 +848,8 @@ async def fetch_next_ohlcv(next_ticker):
     finally:
         await exchange.close()
 
-async def mm_strategy(exchange, marginType):
+async def mm_strategy(exchange, mm_positions):
     try:
-        balance = await exchange.fetch_balance()
-        ex_positions = balance['info']['positions']
-        mm_positions = [position for position in ex_positions 
-            if position['symbol'].endswith(marginType) and float(position['positionAmt']) != 0]
-
         # sumProfit = sum([float(position['unrealizedProfit']) for position in mm_positions])
         sumLongProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) >= 0])
         sumShortProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) < 0])
@@ -986,9 +981,6 @@ async def update_all_balance(marginType, checkMM=True):
     try:
         exchange = getExchange()
 
-        if checkMM:
-            await mm_strategy(exchange, marginType)
-
         balance = await exchange.fetch_balance()
         ex_positions = balance['info']['positions']
         positions = [position for position in ex_positions 
@@ -1025,6 +1017,9 @@ async def update_all_balance(marginType, checkMM=True):
             print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
                 
         logger.info(f'countTrade:{count_trade} (L:{count_trade_long},S:{count_trade_short}) balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
+
+        if checkMM:
+            await mm_strategy(exchange,positions)
 
         loops = [cancel_order(exchange, symbol) for symbol in orders_history.keys() if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list()]
         await gather(*loops)
