@@ -438,7 +438,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
     # delay เพื่อให้กระจายการ trade ของ symbol มากขึ้น
     delay = randint(5,10)
     # จัดลำดับการ trade symbol
-    if symbol in orders_history.keys:
+    if symbol in orders_history.keys():
         winRate = orders_history[symbol]['win']/orders_history[symbol]['trade']
         if winRate > 0.5:
             delay = 0
