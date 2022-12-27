@@ -6,8 +6,8 @@ open futures order by cross signal between fast and slow indicator
 
 ## v1.4.7
 - เพิ่มการใช้ MACD ในการเปิด position
-- คำนวนค่า take profit จาก fibo ของ max/min (ยังไม่เรียบร้อย)
-- คำนวนค่า stop loss จาก swing low/high (ยังไม่เรียบร้อย)
+- คำนวนค่า take profit จาก fibo ของ max/min
+- คำนวนค่า stop loss จาก swing low/high
 - แจ้ง error ทาง line
 - ปรับปรุง Active Price ของ Trailing Stop 
 - ปรับปรุงการตรวจสอบชื่อเหรียญมีเครื่องหมาย _ (ขีดล่าง)

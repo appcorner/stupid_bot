@@ -129,7 +129,7 @@ def getExchange():
         exchange.set_sandbox_mode(True)
     return exchange
 
-def cal_minmax_fibo(symbol, df, pd=''):
+def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     iday = df.tail(CANDLE_PLOT)
 
     # swing low
@@ -163,56 +163,14 @@ def cal_minmax_fibo(symbol, df, pd=''):
     isFiboRetrace = True
     minmax_points = []
     fibo_levels = []
-    periods = 6
+    periods = config.SWING_TF
     swing_lows = []
     swing_highs = []
+    tp = 0.0
+    sl = 0.0
 
     logger.debug(minimum_index)
     logger.debug(maximum_index)
-
-    if 'long' in pd.lower():
-        isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S%z') > datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S%z')
-        # print(isFiboRetrace)
-
-        if isFiboRetrace:
-            minmax_points.append((maximum_index,maximum_price))
-            minmax_points.append((minimum_index,minimum_price))
-            for fibo_val in fibo_values:
-                fibo_level = minimum_price + difference * fibo_val
-                fibo_levels.append(fibo_level)
-        else:
-            maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
-            # print(maxidx)
-            new_minimum_index = iday_minmax['low'].iloc[maxidx+1:].idxmin()
-            new_minimum_price = iday_minmax['low'].iloc[maxidx+1:].min()
-            minmax_points.append((minimum_index,minimum_price))
-            minmax_points.append((maximum_index,maximum_price))
-            minmax_points.append((new_minimum_index,new_minimum_price))
-            for fibo_val in fibo_values:
-                fibo_level = new_minimum_price + difference * fibo_val
-                fibo_levels.append(fibo_level)
-
-    elif 'short' in pd.lower() :
-        isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S%z') < datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S%z')
-        # print(isFiboRetrace)
-
-        if isFiboRetrace:
-            minmax_points.append((minimum_index,minimum_price))
-            minmax_points.append((maximum_index,maximum_price))
-            for fibo_val in fibo_values:
-                fibo_level = maximum_price - difference * fibo_val
-                fibo_levels.append(fibo_level)
-        else:
-            minidx = np.where(iday_minmax.index==minimum_index)[0][0]
-            # print(maxidx)
-            new_maximum_index = iday_minmax['high'].iloc[minidx+1:].idxmax()
-            new_maximum_price = iday_minmax['high'].iloc[minidx+1:].max()
-            minmax_points.append((maximum_index,maximum_price))
-            minmax_points.append((minimum_index,minimum_price))
-            minmax_points.append((new_maximum_index,new_maximum_price))
-            for fibo_val in fibo_values:
-                fibo_level = new_maximum_price - difference * fibo_val
-                fibo_levels.append(fibo_level)
 
     # iday_minmax['sw_low'] = np.nan
     # iday_minmax['sw_high'] = np.nan
@@ -225,6 +183,66 @@ def cal_minmax_fibo(symbol, df, pd=''):
                 swing_highs.append(iday_minmax['high'].iloc[i])
                 # iday_minmax['sw_high'].iloc[i] =  iday_minmax['low'].iloc[i]
 
+    if 'long' in pd.lower():
+        isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S%z') > datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S%z')
+        # print(isFiboRetrace)
+
+        if isFiboRetrace:
+            minmax_points.append((maximum_index,maximum_price))
+            minmax_points.append((minimum_index,minimum_price))
+            for idx, fibo_val in enumerate(fibo_values):
+                fibo_level = minimum_price + difference * fibo_val
+                fibo_levels.append(fibo_level)
+                if tp == 0.0 and closePrice < fibo_level:
+                    tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
+                    tp = minimum_price + difference * fibo_values[tp_fibo]
+        else:
+            maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
+            # print(maxidx)
+            new_minimum_index = iday_minmax['low'].iloc[maxidx+1:].idxmin()
+            new_minimum_price = iday_minmax['low'].iloc[maxidx+1:].min()
+            minmax_points.append((minimum_index,minimum_price))
+            minmax_points.append((maximum_index,maximum_price))
+            minmax_points.append((new_minimum_index,new_minimum_price))
+            for idx, fibo_val in enumerate(fibo_values):
+                fibo_level = new_minimum_price + difference * fibo_val
+                fibo_levels.append(fibo_level)
+                if tp == 0.0 and closePrice < fibo_level:
+                    tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
+                    tp = new_minimum_price + difference * fibo_values[tp_fibo]
+                
+        sl = min(swing_lows[-config.SWING_TEST:])
+
+    elif 'short' in pd.lower() :
+        isFiboRetrace = datetime.strptime(str(minimum_index), '%Y-%m-%d %H:%M:%S%z') < datetime.strptime(str(maximum_index), '%Y-%m-%d %H:%M:%S%z')
+        # print(isFiboRetrace)
+
+        if isFiboRetrace:
+            minmax_points.append((minimum_index,minimum_price))
+            minmax_points.append((maximum_index,maximum_price))
+            for idx, fibo_val in enumerate(fibo_values):
+                fibo_level = maximum_price - difference * fibo_val
+                fibo_levels.append(fibo_level)
+                if tp == 0.0 and closePrice > fibo_level:
+                    tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
+                    tp = maximum_price - difference * fibo_values[tp_fibo]
+        else:
+            minidx = np.where(iday_minmax.index==minimum_index)[0][0]
+            # print(maxidx)
+            new_maximum_index = iday_minmax['high'].iloc[minidx+1:].idxmax()
+            new_maximum_price = iday_minmax['high'].iloc[minidx+1:].max()
+            minmax_points.append((maximum_index,maximum_price))
+            minmax_points.append((minimum_index,minimum_price))
+            minmax_points.append((new_maximum_index,new_maximum_price))
+            for idx, fibo_val in enumerate(fibo_values):
+                fibo_level = new_maximum_price - difference * fibo_val
+                fibo_levels.append(fibo_level)
+                if tp == 0.0 and closePrice > fibo_level:
+                    tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
+                    tp = new_maximum_price - difference * fibo_values[tp_fibo]
+                    
+        sl = max(swing_highs[-config.SWING_TEST:])
+
     return {
         'fibo_type': 'retractment' if isFiboRetrace else 'extension',
         'difference': difference,
@@ -232,7 +250,9 @@ def cal_minmax_fibo(symbol, df, pd=''):
         'fibo_values': fibo_values,
         'fibo_levels': fibo_levels,
         'swing_highs': swing_highs,
-        'swing_lows': swing_lows
+        'swing_lows': swing_lows,
+        'tp': tp,
+        'sl': sl
     }
 
 async def line_chart(symbol, df, msg, pd='', fibo_data=None):
@@ -279,11 +299,11 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
             linestyle='-.',
             linewidths=1,
             )
-        tpls_colors = ['g','r']
-        tpls_data = [max(fibo_data['swing_highs'][-config.SWING_TEST:]), min(fibo_data['swing_lows'][-config.SWING_TEST:])]
+        tpsl_colors = ['g','r']
+        tpsl_data = [fibo_data['tp'], fibo_data['sl']]
         tpsl_lines = dict(
-            hlines=tpls_data,
-            colors=tpls_colors,
+            hlines=tpsl_data,
+            colors=tpsl_colors,
             alpha=0.5,
             linestyle='-.',
             linewidths=1,
@@ -291,7 +311,7 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
         minmax_lines = dict(
             alines=fibo_data['min_max'],
             colors='black',
-            # linestyle='-.',
+            linestyle='--',
             linewidths=0.1,
             )
         fibo_title = ' fibo-'+fibo_data['fibo_type'][0:2]
@@ -304,20 +324,9 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
     filename = f"./plots/order_{symbol}.png"
     fig, axlist = mpf.plot(
         data,
-        # volume=True,
-        # figratio=(8, 6),
-        # panel_ratios=(8,2,2,2),
         **kwargs,
         type="candle",
-        # title=f'{symbol} {pd} ({config.timeframe} @ {data.index[-1]} fibo_{fibo_type})',
-        # addplot=added_plots,
-        # hlines=fibo_lines,
-        # alines=minmax_lines,
-        # tight_layout=True,
         style=mystyle,
-        # savefig=filename,
-        # figscale=1.2,
-        # scale_padding={'left': 0.5, 'top': 2.5, 'right': 3.5, 'bottom': 0.75},
         returnfig=True,
     )
 
@@ -329,6 +338,11 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
         fibo_levels = fibo_data['fibo_levels']
         for idx, fibo_val in enumerate(fibo_data['fibo_values']):
             axlist[0].text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]:.4f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
+
+        fibo_tp = fibo_data['tp']
+        axlist[0].text(CANDLE_PLOT,fibo_tp - difference * 0.04,f'TP({fibo_tp:.4f})',fontsize=8,color='g',horizontalalignment='right')
+        fibo_sl = fibo_data['sl']
+        axlist[0].text(CANDLE_PLOT,fibo_sl - difference * 0.04,f'SL({fibo_sl:.4f})',fontsize=8,color='r',horizontalalignment='right')
 
     fig.savefig(filename)
 
@@ -814,7 +828,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
 
             print(f'{symbol:12} LONG')
-            fibo_data = cal_minmax_fibo(symbol, df, 'LONG')
+            fibo_data = cal_minmax_fibo(symbol, df, 'LONG', closePrice)
             if tradeMode == 'on' and balance_entry > config.Not_Trade \
                 and (config.limit_Trade > count_trade or config.limit_Trade_Long > count_trade_long) :
                 count_trade_long = count_trade_long + 1
@@ -843,17 +857,25 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         callbackLong = config.Callback_PNL_Long
                     else:
                         closeRate = TPCloseLong
-                        pricetp = round(priceEntry + (priceEntry * (TPLong / 100.0)), NUM_OF_DECIMALS)
-                        notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp:.5f}')
+                        if TPLong > 0:
+                            pricetp = round(priceEntry + (priceEntry * (TPLong / 100.0)), NUM_OF_DECIMALS)
+                            notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp:.5f}')
+                        else:
+                            pricetp = fibo_data['tp']
+                            notify_msg.append(f'TP: (AUTO) @{pricetp:.5f}')
                         if activeTLLong > 0:
                             priceTL = round(priceEntry + (priceEntry * (activeTLLong / 100.0)), NUM_OF_DECIMALS)
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Long > 0:
                         pricesl = round(priceEntry - (config.SL_PNL_Long / amount), NUM_OF_DECIMALS)
                         notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
-                    else:
+                    elif SLLong > 0:
                         pricesl = round(priceEntry - (priceEntry * (SLLong / 100.0)), NUM_OF_DECIMALS)
                         notify_msg.append(f'SL: {SLLong:.2f}% @{pricesl:.5f}')
+                    else:
+                        pricesl = fibo_data['sl']
+                        notify_msg.append(f'SL: (AUTO) @{pricesl:.5f}')
+
 
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
                     print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
@@ -889,7 +911,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
 
             print(f'{symbol:12} SHORT')
-            fibo_data = cal_minmax_fibo(symbol, df, 'SHORT')
+            fibo_data = cal_minmax_fibo(symbol, df, 'SHORT', closePrice)
             if tradeMode == 'on' and balance_entry > config.Not_Trade \
                 and (config.limit_Trade > count_trade or config.limit_Trade_Short > count_trade_short) :
                 count_trade_short = count_trade_short + 1
@@ -918,17 +940,24 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         callbackShort = config.Callback_PNL_Short
                     else:
                         closeRate = TPCloseShort
-                        pricetp = round(priceEntry - (priceEntry * (TPShort / 100.0)), NUM_OF_DECIMALS)
-                        notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp:.5f}')
+                        if TPShort > 0:
+                            pricetp = round(priceEntry - (priceEntry * (TPShort / 100.0)), NUM_OF_DECIMALS)
+                            notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp:.5f}')
+                        else:
+                            pricetp = fibo_data['tp']
+                            notify_msg.append(f'TP: (AUTO) @{pricetp:.5f}')
                         if activeTLShort > 0:
                             priceTL = round(priceEntry - (priceEntry * (activeTLShort / 100.0)), NUM_OF_DECIMALS)
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Short > 0:
                         pricesl = round(priceEntry + (config.SL_PNL_Short / amount), NUM_OF_DECIMALS)
                         notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl:.5f}')
-                    else:
+                    elif SLShort > 0:
                         pricesl = round(priceEntry + (priceEntry * (SLShort / 100.0)), NUM_OF_DECIMALS)
                         notify_msg.append(f'SL: {SLShort:.2f}% @{pricesl:.5f}')
+                    else:
+                        pricesl = fibo_data['sl']
+                        notify_msg.append(f'SL: (AUTO) @{pricesl:.5f}')
 
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
                     print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')

@@ -80,7 +80,7 @@ SANDBOX = (get_str('binance','sandbox', 'off') == 'on')
 # line
 #------------------------------------------------------------
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
-Remove_Plot = get_str('line','remove_plot', 'off')
+RemovePlot = (get_str('line','remove_plot', 'off') == 'on')
 
 #------------------------------------------------------------
 # app_config
@@ -92,6 +92,9 @@ LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
 UB_TIMER_MODE = get_int('app_config', 'UB_TIMER_MODE', 4)
 if UB_TIMER_MODE < 0 or UB_TIMER_MODE > 5:
     UB_TIMER_MODE = 4
+SWING_TF = get_int('app_config', 'SWING_TF', 5)
+SWING_TEST = get_int('app_config', 'SWING_TEST', 3)
+TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
 
 #------------------------------------------------------------
 # setting
@@ -165,6 +168,7 @@ Mid_Value = get_int('setting', 'mid_value')
 Slow_Type = get_str('setting', 'slow_type')
 Slow_Value = get_int('setting', 'slow_value')
 
+isConfirmMACD = get_str('setting', 'confirm_macd_mode', 'on') == 'on'
 MACD_FAST = get_int('setting', 'macd_fast')
 MACD_SLOW = get_int('setting', 'macd_slow')
 MACD_SIGNAL = get_int('setting', 'macd_signal')
