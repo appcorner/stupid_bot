@@ -633,7 +633,7 @@ async def long_TLSTOP(exchange, symbol, amount: float, priceTL: float, callbackR
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
     logger.debug(order)
-    activatePrice = order['info']['activatePrice']
+    activatePrice = float(order['info']['activatePrice'])
     await sleep(1)
     return activatePrice
 #-------------------------------------------------------------------------------
@@ -665,7 +665,7 @@ async def short_TLSTOP(exchange, symbol, amount: float, priceTL: float, callback
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
     logger.debug(order)
-    activatePrice = order['info']['activatePrice']
+    activatePrice = float(order['info']['activatePrice'])
     await sleep(1)
     return activatePrice
 #-------------------------------------------------------------------------------
@@ -862,12 +862,12 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     activatePrice = await long_TLSTOP(exchange, symbol, amount, priceTL, callbackLong)
                     print(f'[{symbol}] Set Trailing Stop {priceTL:.4f}')
                     # callbackLong_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackLong])
-                    if config.TP_PNL_Long > 0:
+                    if priceTL == 0.0:
+                        notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: (AUTO) @{activatePrice:.5f}')
+                    elif config.TP_PNL_Long > 0:
                         notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price PNL: {config.Active_TL_PNL_Long:.2f} @{activatePrice:.5f}')
                     elif activeTLLong > 0:
                         notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: {activeTLLong:.2f}% @{activatePrice:.5f}')
-                    else:
-                        notify_msg.append(f'# TrailingStop\nCall Back: {callbackLong:.2f}%\nActive Price: (AUTO) @{activatePrice:.5f}')
 
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG', fibo_data) )
                 
@@ -935,15 +935,15 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
                 if trailingStopMode == 'on' and closeRate < 100.0:
                     activatePrice = await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
-                    print(f'[{symbol}] Set Trailing Stop {priceTL:.5f}')
+                    print(f'[{symbol}] Set Trailing Stop {activatePrice:.5f}')
                     # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
-                    if config.TP_PNL_Short > 0:
+                    if priceTL == 0.0:
+                        notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: (AUTO) @{activatePrice:.5f}')
+                    elif config.TP_PNL_Short > 0:
                         notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price PNL: {config.Active_TL_PNL_Short:.2f} @{activatePrice:.5f}')
                     elif activeTLShort > 0:
                         notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: {activeTLShort:.2f}% @{activatePrice:.5f}')
-                    else:
-                        notify_msg.append(f'# TrailingStop\nCall Back: {callbackShort:.2f}%\nActive Price: (AUTO) @{activatePrice:.5f}')
- 
+
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT', fibo_data) )
 
             elif tradeMode != 'on' :
