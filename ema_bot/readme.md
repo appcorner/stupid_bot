@@ -4,6 +4,14 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.7
+- เพิ่มการใช้ MACD ในการเปิด position
+- คำนวนค่า take profit จาก fibo ของ max/min (ยังไม่เรียบร้อย)
+- คำนวนค่า stop loss จาก swing low/high (ยังไม่เรียบร้อย)
+- แจ้ง error ทาง line
+- ปรับปรุง Active Price ของ Trailing Stop 
+- ปรับปรุงการตรวจสอบชื่อเหรียญมีเครื่องหมาย _ (ขีดล่าง)
+
 ## v1.4.6
 - ปรับการปิด position แบบ PNL ใหม่ โดยปรับไปใช้ TP/SL Order แทนการปิด position ด้วยบอท
 - เพิ่ม sandbox mode สำหรับ https://testnet.binancefuture.com
@@ -108,8 +116,9 @@ open futures order by cross signal between fast and slow indicator
     ;# ค่า callback rate จะต้องอยู่ระหว่าง 0.1 ถึง 5.0
     callback_long = 5.0
     callback_short = 5.0
-    active_tl_long = 10.0
-    active_tl_short = 10.0
+    ;# ค่า active tl มีปัญหา ให้กำหนดเป็น 0.0 เพื่อให้ API กำหนด auto จะเป็นราคาใกล้ๆราคาตลาด
+    active_tl_long = 0.0
+    active_tl_short = 0.0
 
     ;# กำหนดค่า fast, mid, slow เพื่อให้บอทใช้หาสัญญานในการเปิด position
     ;# ระบุ type fast,slow => EMA, SMA, HMA, RMA, WMA, VWMA
@@ -141,13 +150,15 @@ open futures order by cross signal between fast and slow indicator
     tp_pnl_long = 0.30
     tp_pnl_close_rate_long = 25.0
     sl_pnl_long = 0.10
-    active_tl_pnl_long = 0.30
+    ;# ค่า active tl มีปัญหา ให้กำหนดเป็น 0.0 เพื่อให้ API กำหนด auto จะเป็นราคาใกล้ๆราคาตลาด
+    active_tl_pnl_long = 0.0
     callback_pnl_long = 5.0
     ;# ใช้กับ short position
     tp_pnl_short = 0.30
     tp_pnl_close_rate_short = 25.0
     sl_pnl_short = 0.10
-    active_tl_pnl_short = 0.30
+    ;# ค่า active tl มีปัญหา ให้กำหนดเป็น 0.0 เพื่อให้ API กำหนด auto จะเป็นราคาใกล้ๆราคาตลาด
+    active_tl_pnl_short = 0.0
     callback_pnl_short = 5.0
 
     ;# TP/SL เพื่อปิด positions ทั้งหมด โดยใช้ค่าผลรวมของ profit มาเป็นตัวกำหนด โดยบอทจะทำ TP/SL ตามรอบเวลาที่กำหนดไว้ (default 60 secs)
