@@ -81,6 +81,7 @@ SANDBOX = (get_str('binance','sandbox', 'off') == 'on')
 #------------------------------------------------------------
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 RemovePlot = (get_str('line','remove_plot', 'off') == 'on')
+SummaryReport = (get_str('line','summary_report', 'off') == 'on')
 
 #------------------------------------------------------------
 # app_config
@@ -93,7 +94,7 @@ UB_TIMER_MODE = get_int('app_config', 'UB_TIMER_MODE', 4)
 if UB_TIMER_MODE < 0 or UB_TIMER_MODE > 5:
     UB_TIMER_MODE = 4
 SWING_TF = get_int('app_config', 'SWING_TF', 5)
-SWING_TEST = get_int('app_config', 'SWING_TEST', 3)
+SWING_TEST = get_int('app_config', 'SWING_TEST', 2)
 TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
 
 #------------------------------------------------------------

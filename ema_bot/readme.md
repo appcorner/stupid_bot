@@ -11,6 +11,7 @@ open futures order by cross signal between fast and slow indicator
 - แจ้ง error ทาง line
 - ปรับปรุง Active Price ของ Trailing Stop 
 - ปรับปรุงการตรวจสอบชื่อเหรียญมีเครื่องหมาย _ (ขีดล่าง)
+- แจ้งสรุป balance ตามรอบ timeframe
 
 ## v1.4.6
 - ปรับการปิด position แบบ PNL ใหม่ โดยปรับไปใช้ TP/SL Order แทนการปิด position ด้วยบอท
@@ -60,6 +61,10 @@ open futures order by cross signal between fast and slow indicator
 
     [line]
     notify_token = <line notify token>
+    ;# กำหนด on/off เพื่อ เปิด/ปิด การลบรูปกราฟหลังจากใช้งานเสร็จ
+    remove_plot = on
+    ;# กำหนด on/off เพื่อ เปิด/ปิด การรายงานสรุป
+    summary_report = on
 
     [app_config]
     ;TIME_SHIFT = 5
@@ -71,6 +76,12 @@ open futures order by cross signal between fast and slow indicator
     ;# กำหนดรอบเวลาในแสดง update balancec และ mm check
     ;# 0=timeframe, 1=15, 2=20, 3=30, 4=60, 5=timeframe/2 
     UB_TIMER_MODE = 3
+    ;# จำนวน TF ในการตรวจหา swing low/high
+    ;SWING_TF = 5
+    ;# จำนวนค่า swing low/high ที่ใช้ในการคิด SL
+    ;SWING_TEST = 2
+    ;# level ของ fibo ที่ใช้ในการคิด TP
+    ;TP_FIBO = 2
 
     [setting]
     ;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d

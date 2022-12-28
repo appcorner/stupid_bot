@@ -174,7 +174,7 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
 
     # iday_minmax['sw_low'] = np.nan
     # iday_minmax['sw_high'] = np.nan
-    for i in range(len(iday_minmax)+config.SignalIndex):
+    for i in range(len(iday_minmax)):
         if i >= periods:
             if min(iday_minmax['low'].iloc[i-periods:i+1+periods]) == iday_minmax['low'].iloc[i]:
                 swing_lows.append(iday_minmax['low'].iloc[i])
@@ -276,11 +276,12 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
     kwargs = dict(
         volume=True,volume_panel=1,
         figscale=1.2,
-        figratio=(12, 6),
+        figratio=(8, 7),
         panel_ratios=(8,2,2,2),
         addplot=added_plots,
-        tight_layout=True,
-        scale_padding={'left': 0.5, 'top': 2.5, 'right': 2.5, 'bottom': 0.75},
+        # tight_layout=True,
+        # scale_padding={'left': 0.5, 'top': 2.5, 'right': 2.5, 'bottom': 0.75},
+        scale_padding={'left': 0.5, 'top': 0.6, 'right': 1.0, 'bottom': 0.4},
         )
 
     fibo_title = ''
@@ -1220,7 +1221,7 @@ async def mm_strategy(exchange, mm_positions):
         print(type(ex).__name__, str(ex))
         logger.exception('mm_strategy')
 
-async def update_all_balance(marginType, checkMM=True):
+async def update_all_balance(marginType, checkMM=True, notifyLine=False):
     global all_positions, balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, orders_history
     try:
         exchange = getExchange()
@@ -1253,12 +1254,21 @@ async def update_all_balance(marginType, checkMM=True):
         if config.Trade_Mode == 'on':
             # print("all_positions ================")
             print(all_positions)
+            ub_msg = []
+            ub_msg.append('รายงานสรุป')
             if config.limit_Trade > 0:
+                ub_msg.append(f"# Count Trade\nLong+Short: {count_trade}/{config.limit_Trade}")
                 print(f"Count Trade ===== {count_trade}/{config.limit_Trade}")
             else:
+                ub_msg.append(f"# Count Trade\nLong: {count_trade_long}/{config.limit_Trade_Long}\nShort: {count_trade_short}/{config.limit_Trade_Short}")
                 print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
+            ub_msg.append(f"# Balance\nCurrent: {balance_entry:,.4f}\nMargin: {sumMargin:+,.4f}\nProfit: {sumProfit:+,.4f}")
+            ub_msg.append(f"Total: {balalce_total:,.4f}\nChange: {balance_change:+,.4f}")
             print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.4f} Profit: {sumProfit:+,.4f}")
             print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
+
+            if notifyLine:
+                notify.Send_Text('\n'.join(ub_msg))
                 
         logger.info(f'countTrade:{count_trade} (L:{count_trade_long},S:{count_trade_short}) balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
 
@@ -1372,7 +1382,7 @@ async def main():
     logger.info(f'first ohlcv: {t2:0.2f} secs')
 
     # แสดงค่า positions & balance
-    await update_all_balance(config.MarginType)
+    await update_all_balance(config.MarginType, notifyLine=config.SummaryReport)
     start_balance_total = balalce_total
 
     await set_order_history(all_positions['symbol'].to_list())
@@ -1393,7 +1403,7 @@ async def main():
                 local_time = time.ctime(seconds)
                 print(f'calculate new indicator: {local_time}')
                 
-                await update_all_balance(config.MarginType)
+                await update_all_balance(config.MarginType, notifyLine=config.SummaryReport)
 
                 t1=time.time()
 
