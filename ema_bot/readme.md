@@ -115,6 +115,7 @@ open futures order by cross signal between fast and slow indicator
     not_trade = 10.0
 
     tpsl_mode = on
+    ;# ต้องให้คำนวน TP/SL auto ให้กำหนดค่า tp_long, tp_short, sl_long, sl_short เป็น 0.0 
     tp_long = 10.0
     tp_short = 10.0
     tp_close_long = 50.0
@@ -155,6 +156,7 @@ open futures order by cross signal between fast and slow indicator
     ; csv_name = symbol_config.csv
 
     [mm]
+    ;# ต้องให้คำนวน TP/SL auto ให้กำหนดค่า tp_pnl_long, tp_pnl_short, sl_pnl_long, sl_pnl_short เป็น 0.0 
     ;# ค่าตัวแปรต่างๆ กำหนดค่าเป็น 0 หรือ comment ถ้าต้องการปิดการทำงาน
 
     ;# ตั้ง TP/SL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด

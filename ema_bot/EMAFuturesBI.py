@@ -1,4 +1,5 @@
 from asyncio import get_event_loop, gather, sleep
+import numpy as np
 import pandas as pd
 import pandas_ta as ta
 import time
@@ -10,7 +11,6 @@ import pathlib
 import logging
 from logging.handlers import RotatingFileHandler
 from random import randint
-import numpy as np
 from datetime import datetime
 from decimal import *
 
