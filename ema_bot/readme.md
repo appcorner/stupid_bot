@@ -191,6 +191,10 @@ open futures order by cross signal between fast and slow indicator
     ;# เมื่อปิดเปิดบอทใหม่ watch_list จะเป็นค่าเดิมที่ตั้งไว้
     loss_limit = 0
 
+## download
+v1.4.7
+https://mega.nz/file/6IZQjDqL#H1kNAf6YO9IWuMc0nRv8BrDKtkmB_uiNU-TGE0lGP9w
+
 ## donate
 - ETH: 0xeAfe7f1Db46E2c007b60174EB4527ab38bd54B54
 - DOGE: DCkpCgt1HUVhCsvJVW7YA4E4NkxMsLHPz8
