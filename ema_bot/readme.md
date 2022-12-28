@@ -140,6 +140,8 @@ open futures order by cross signal between fast and slow indicator
     slow_type = EMA
     slow_value = 34
 
+    ;# กำหนด on/off สำหรับตรวจสอบ macd ก่อนเปิด position
+    confirm_macd_mode = on
     ;# สำหรับคำนวน macd fast 12, slow 16, signal 9 คือค่ามาตราฐาน
     macd_fast = 12
     macd_slow = 26
