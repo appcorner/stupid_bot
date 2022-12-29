@@ -177,6 +177,8 @@ MACD_SIGNAL = get_int('setting', 'macd_signal')
 RSI_PERIOD = get_int('setting', 'rsi_period')
 
 isDetectSideway = get_str('setting', 'detect_sideway', 'on') == 'on'
+ATRMultiple = get_float('setting', 'atr_multiple', 1.5)
+RollingPeriod = get_int('setting', 'rolling_period', 15)
 
 #------------------------------------------------------------
 # symbols_setting

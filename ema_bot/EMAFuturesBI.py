@@ -831,7 +831,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             isShortEnter = isShortEnter and (df.iloc[signalIdx][config.ConfirmMACDBy] < 0)
 
         if config.isDetectSideway and (isLongEnter or isShortEnter):
-            sideways = detect_sideway_trend(df)
+            sideways = detect_sideway_trend(df, config.ATRMultiple, config.RollingPeriod)
             if sideways[signalIdx] == 1:
                 isLongEnter = False
                 isShortEnter = False
@@ -923,7 +923,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Long > 0:
                         pricesl = round(priceEntry - (config.SL_PNL_Long / amount), NUM_OF_DECIMALS)
-                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl:.5f}'
+                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}'
                         fibo_data['sl'] = pricesl
                         notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
                     elif SLLong > 0:

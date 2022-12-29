@@ -100,6 +100,10 @@ macd_signal = 9
 ;# สำหรับคำนวน rsi, 14 คือค่ามาตราฐาน
 rsi_period = 14
 
+detect_sideway = on
+atr_multiple = 1.5
+rolling_period = 15
+
 [symbols_setting]
 ;# กำหนดค่า setting แยกตามเหรียญ
 ;# ชื่อไฟล์ที่เก็บ setting ต้องเป็นไฟล์ csv, comment ถ้าต้องการปิดการทำงาน
