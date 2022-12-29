@@ -12,7 +12,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from random import randint
 from datetime import datetime
-from decimal import *
+# from decimal import Decimal
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -23,7 +23,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4.7'
+bot_name = 'EMA Futures (Binance) version 1.4.8'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -89,7 +89,7 @@ CSV_COLUMNS = [
         ]
 
 NUM_OF_DECIMALS = 7
-getcontext().prec = NUM_OF_DECIMALS
+# getcontext().prec = NUM_OF_DECIMALS
 
 # ----------------------------------------------------------------------------
 # global variable
@@ -129,6 +129,40 @@ def getExchange():
         exchange.set_sandbox_mode(True)
     return exchange
 
+def detect_sideway_trend(df, atr_multiple=1.5, n=15):
+    sw_df = df.copy()
+
+    avehigh = sw_df['high'].rolling(n).mean()
+    avelow = sw_df['low'].rolling(n).mean()
+    avemidprice = (avehigh + avelow) / 2
+
+    # get upper and lower bounds to compare to period highs and lows
+    high_low = sw_df['high'] - sw_df['low']
+    high_close = np.abs(sw_df['high'] - sw_df['close'].shift())
+    low_close = np.abs(sw_df['low'] - sw_df['close'].shift())
+    ranges = pd.concat([high_low, high_close, low_close], axis=1)
+    true_range = np.max(ranges, axis=1)
+    atr14 = true_range.rolling(14).sum()/14
+
+    sw_df['UPB'] = avemidprice + atr_multiple * atr14
+    sw_df['LPB'] = avemidprice - atr_multiple * atr14
+
+    # get the period highs and lows
+    sw_df['rangemaxprice'] = sw_df[['high']].rolling(n).max()
+    sw_df['rangeminprice'] = sw_df[['low']].rolling(n).min()
+    # df['sideways'] = 0
+
+    def sideways_range(maxp, minp, upb, lpb):
+        if maxp < upb and maxp > lpb and minp < upb and minp > lpb:
+            return 1
+        else:
+            return 0
+
+    sideways = sw_df[['rangemaxprice', 'rangeminprice', 'UPB', 'LPB']].apply(lambda x: sideways_range(x['rangemaxprice'], x['rangeminprice'], x['UPB'], x['LPB']), axis=1)
+    del sw_df
+
+    return sideways
+
 def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     iday = df.tail(CANDLE_PLOT)
 
@@ -158,7 +192,8 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     #Calculate the max high and min low price
     difference = maximum_price - minimum_price #Get the difference
 
-    fibo_values = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1,1.382]
+    # fibo_values = [0,0.1618,0.236,0.382,0.5,0.618,0.786,1,1.382]
+    fibo_values = [0,0.236,0.382,0.5,0.618,0.786,1,1.382]
 
     isFiboRetrace = True
     minmax_points = []
@@ -197,7 +232,8 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = minimum_price + difference * fibo_values[tp_fibo]
         else:
-            maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
+            # maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
+            maxidx = iday_minmax.index.get_loc(maximum_index)
             # print(maxidx)
             new_minimum_index = iday_minmax['low'].iloc[maxidx+1:].idxmin()
             new_minimum_price = iday_minmax['low'].iloc[maxidx+1:].min()
@@ -227,7 +263,8 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = maximum_price - difference * fibo_values[tp_fibo]
         else:
-            minidx = np.where(iday_minmax.index==minimum_index)[0][0]
+            # minidx = np.where(iday_minmax.index==minimum_index)[0][0]
+            minidx = iday_minmax.index.get_loc(minimum_index)
             # print(maxidx)
             new_maximum_index = iday_minmax['high'].iloc[minidx+1:].idxmax()
             new_maximum_price = iday_minmax['high'].iloc[minidx+1:].max()
@@ -252,7 +289,9 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
         'swing_highs': swing_highs,
         'swing_lows': swing_lows,
         'tp': tp,
-        'sl': sl
+        'sl': sl,
+        'tp_txt':'-',
+        'sl_txt':'-'
     }
 
 async def line_chart(symbol, df, msg, pd='', fibo_data=None):
@@ -269,7 +308,7 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
         mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
         mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
         mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
-        mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors),
+        mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors,ylabel=f"MACD"),
         mpf.make_addplot(data['MACDs'],panel=3,color='blue',width=0.75),
     ]
 
@@ -281,7 +320,7 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
         addplot=added_plots,
         # tight_layout=True,
         # scale_padding={'left': 0.5, 'top': 2.5, 'right': 2.5, 'bottom': 0.75},
-        scale_padding={'left': 0.5, 'top': 0.6, 'right': 1.0, 'bottom': 0.4},
+        scale_padding={'left': 0.5, 'top': 0.6, 'right': 1.0, 'bottom': 0.5},
         )
 
     fibo_title = ''
@@ -338,12 +377,14 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
         difference = fibo_data['difference']
         fibo_levels = fibo_data['fibo_levels']
         for idx, fibo_val in enumerate(fibo_data['fibo_values']):
-            axlist[0].text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]:.4f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
+            axlist[0].text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]:.5f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
 
         fibo_tp = fibo_data['tp']
-        axlist[0].text(CANDLE_PLOT,fibo_tp - difference * 0.04,f'TP({fibo_tp:.4f})',fontsize=8,color='g',horizontalalignment='right')
+        fibo_tp_txt = fibo_data['tp_txt']
+        axlist[0].text(CANDLE_PLOT,fibo_tp - difference * 0.04,fibo_tp_txt,fontsize=8,color='g',horizontalalignment='right')
         fibo_sl = fibo_data['sl']
-        axlist[0].text(CANDLE_PLOT,fibo_sl - difference * 0.04,f'SL({fibo_sl:.4f})',fontsize=8,color='r',horizontalalignment='right')
+        fibo_sl_txt = fibo_data['sl_txt']
+        axlist[0].text(CANDLE_PLOT,fibo_sl - difference * 0.04,fibo_sl_txt,fontsize=8,color='r',horizontalalignment='right')
 
     fig.savefig(filename)
 
@@ -644,7 +685,7 @@ async def long_TLSTOP(exchange, symbol, amount: float, priceTL: float, callbackR
         # 'reduceOnly': True
     }
     if priceTL > 0:
-        params['activationPrice'] = Decimal(priceTL)
+        params['activationPrice'] = float(priceTL)
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
     logger.debug(order)
@@ -676,7 +717,7 @@ async def short_TLSTOP(exchange, symbol, amount: float, priceTL: float, callback
         # 'reduceOnly': True
     }
     if priceTL > 0:
-        params['activationPrice'] = Decimal(priceTL)
+        params['activationPrice'] = float(priceTL)
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
     logger.debug(order)
@@ -786,8 +827,16 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
         isShortExit = (fast[0] < mid[0] and fast[1] > mid[1])
 
         if config.isConfirmMACD:
-            isLongEnter = isLongEnter and (df.iloc[signalIdx]['MACD'] > 0)
-            isShortEnter = isShortEnter and (df.iloc[signalIdx]['MACD'] < 0)
+            isLongEnter = isLongEnter and (df.iloc[signalIdx][config.ConfirmMACDBy] > 0)
+            isShortEnter = isShortEnter and (df.iloc[signalIdx][config.ConfirmMACDBy] < 0)
+
+        if config.isDetectSideway and (isLongEnter or isShortEnter):
+            sideways = detect_sideway_trend(df)
+            if sideways[signalIdx] == 1:
+                isLongEnter = False
+                isShortEnter = False
+                print(f"[{symbol}] สถานะ : Sideway Tread skipping...")
+                logger.info(f'{symbol} -> Sideway Tread')
 
         # print(symbol, isBullish, isBearish, fast, slow)
 
@@ -852,6 +901,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     if config.TP_PNL_Long > 0:
                         closeRate = config.TP_PNL_Close_Long
                         pricetp = round(priceEntry + (config.TP_PNL_Long / amount), NUM_OF_DECIMALS)
+                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}'
+                        fibo_data['tp'] = pricetp
                         notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}')
                         if config.Active_TL_PNL_Long > 0:
                             priceTL = round(priceEntry + (config.Active_TL_PNL_Long / amount), NUM_OF_DECIMALS)
@@ -860,21 +911,29 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         closeRate = TPCloseLong
                         if TPLong > 0:
                             pricetp = round(priceEntry + (priceEntry * (TPLong / 100.0)), NUM_OF_DECIMALS)
+                            fibo_data['tp_txt'] = f'TP: {TPLong:.2f}% @{pricetp:.5f}'
+                            fibo_data['tp'] = pricetp
                             notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp:.5f}')
                         else:
                             pricetp = fibo_data['tp']
+                            fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp:.5f}'
                             notify_msg.append(f'TP: (AUTO) @{pricetp:.5f}')
                         if activeTLLong > 0:
                             priceTL = round(priceEntry + (priceEntry * (activeTLLong / 100.0)), NUM_OF_DECIMALS)
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Long > 0:
                         pricesl = round(priceEntry - (config.SL_PNL_Long / amount), NUM_OF_DECIMALS)
+                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl:.5f}'
+                        fibo_data['sl'] = pricesl
                         notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
                     elif SLLong > 0:
                         pricesl = round(priceEntry - (priceEntry * (SLLong / 100.0)), NUM_OF_DECIMALS)
+                        fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl:.5f}'
+                        fibo_data['sl'] = pricesl
                         notify_msg.append(f'SL: {SLLong:.2f}% @{pricesl:.5f}')
                     else:
                         pricesl = fibo_data['sl']
+                        fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl:.5f}'
                         notify_msg.append(f'SL: (AUTO) @{pricesl:.5f}')
 
 
@@ -935,6 +994,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     if config.TP_PNL_Short > 0:
                         closeRate = config.TP_PNL_Close_Short
                         pricetp = round(priceEntry - (config.TP_PNL_Short / amount), NUM_OF_DECIMALS)
+                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}'
+                        fibo_data['tp'] = pricetp
                         notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}')
                         if config.Active_TL_PNL_Short > 0:
                             priceTL = round(priceEntry - (config.Active_TL_PNL_Short / amount), NUM_OF_DECIMALS)
@@ -943,21 +1004,29 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         closeRate = TPCloseShort
                         if TPShort > 0:
                             pricetp = round(priceEntry - (priceEntry * (TPShort / 100.0)), NUM_OF_DECIMALS)
+                            fibo_data['tp_txt'] = f'TP: {TPShort:.2f}% @{pricetp:.5f}'
+                            fibo_data['tp'] = pricetp
                             notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp:.5f}')
                         else:
                             pricetp = fibo_data['tp']
+                            fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp:.5f}'
                             notify_msg.append(f'TP: (AUTO) @{pricetp:.5f}')
                         if activeTLShort > 0:
                             priceTL = round(priceEntry - (priceEntry * (activeTLShort / 100.0)), NUM_OF_DECIMALS)
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Short > 0:
                         pricesl = round(priceEntry + (config.SL_PNL_Short / amount), NUM_OF_DECIMALS)
+                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl:.5f}'
+                        fibo_data['sl'] = pricesl
                         notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl:.5f}')
                     elif SLShort > 0:
                         pricesl = round(priceEntry + (priceEntry * (SLShort / 100.0)), NUM_OF_DECIMALS)
+                        fibo_data['sl_txt'] = f'SL: {SLShort:.2f}% @{pricesl:.5f}'
+                        fibo_data['sl'] = pricesl
                         notify_msg.append(f'SL: {SLShort:.2f}% @{pricesl:.5f}')
                     else:
                         pricesl = fibo_data['sl']
+                        fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl:.5f}'
                         notify_msg.append(f'SL: (AUTO) @{pricesl:.5f}')
 
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)

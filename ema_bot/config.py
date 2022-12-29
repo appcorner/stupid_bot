@@ -169,11 +169,14 @@ Mid_Value = get_int('setting', 'mid_value')
 Slow_Type = get_str('setting', 'slow_type')
 Slow_Value = get_int('setting', 'slow_value')
 
+ConfirmMACDBy = get_str('setting', 'confirm_macd_by', 'MACD')
 isConfirmMACD = get_str('setting', 'confirm_macd_mode', 'on') == 'on'
 MACD_FAST = get_int('setting', 'macd_fast')
 MACD_SLOW = get_int('setting', 'macd_slow')
 MACD_SIGNAL = get_int('setting', 'macd_signal')
 RSI_PERIOD = get_int('setting', 'rsi_period')
+
+isDetectSideway = get_str('setting', 'detect_sideway', 'on') == 'on'
 
 #------------------------------------------------------------
 # symbols_setting
