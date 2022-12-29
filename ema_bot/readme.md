@@ -4,6 +4,9 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.8
+- detect sideway by ค่าเฉลี่ย high row (n periods) และ ATR 14
+
 ## v1.4.7
 - เพิ่มการใช้ MACD ในการเปิด position
 - คำนวนค่า take profit จาก fibo ของ max/min
