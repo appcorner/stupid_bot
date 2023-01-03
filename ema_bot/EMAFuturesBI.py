@@ -132,6 +132,29 @@ def getExchange():
 def detect_sideway_trend(df, atr_multiple=1.5, n=15):
     sw_df = df.copy()
 
+    # Calculate the Bollinger Bands
+    sw_df.ta.bbands(close='Close', length=n, append=True)
+    bb_sfx = f'_{n}_2.0'
+    # columns = {f"BBL{bb_sfx}": "BBL", f"BBM{bb_sfx}": "BBM", f"BBU{bb_sfx}": "BBU", f"BBB{bb_sfx}": "BBB", f"BBP{bb_sfx}": "BBP"}
+    # sw_df.rename(columns=columns, inplace = True)
+    
+    # Check if the current price is within the Bollinger Bands
+    # inBB = sw_df[['close', 'BBL', 'BBU']].apply(lambda x: (1 if x['close'] > x['BBL'] and x['close'] < x['BBU'] else 0), axis=1)
+    inBB = sw_df[['close', f'BBL{bb_sfx}', f'BBU{bb_sfx}']].apply(lambda x: (1 if x['close'] > x[f'BBL{bb_sfx}'] and x['close'] < x[f'BBU{bb_sfx}'] else 0), axis=1)
+    sw_df['inBB'] = inBB
+    
+    # Calculate the MACD
+    # sw_df.ta.macd(close='close', append=True)
+    # macd_sfx = '_12_26_9'
+    # # columns = {f"MACD{macd_sfx}": "MACD", f"MACDs{macd_sfx}": "MACDs", f"MACDh{macd_sfx}": "MACDh"}
+    # # sw_df.rename(columns=columns, inplace = True)
+    
+    # Check if the MACD histogram is positive
+    MACDp = sw_df[['MACDh']].apply(lambda x: (1 if x['MACDh'] > 0 else 0), axis=1)
+    # MACDp = sw_df[[f'MACDh{macd_sfx}']].apply(lambda x: (1 if x[f'MACDh{macd_sfx}'] > 0 else 0), axis=1)
+    sw_df['MACDp'] = MACDp
+
+    # Calculate the rolling average of the high and low prices
     avehigh = sw_df['high'].rolling(n).mean()
     avelow = sw_df['low'].rolling(n).mean()
     avemidprice = (avehigh + avelow) / 2
@@ -148,20 +171,26 @@ def detect_sideway_trend(df, atr_multiple=1.5, n=15):
     sw_df['LPB'] = avemidprice - atr_multiple * atr14
 
     # get the period highs and lows
-    sw_df['rangemaxprice'] = sw_df[['high']].rolling(n).max()
-    sw_df['rangeminprice'] = sw_df[['low']].rolling(n).min()
-    # df['sideways'] = 0
+    rangemaxprice = sw_df['high'].rolling(n).max()
+    rangeminprice = sw_df['low'].rolling(n).min()
 
-    def sideways_range(maxp, minp, upb, lpb):
-        if maxp < upb and maxp > lpb and minp < upb and minp > lpb:
-            return 1
-        else:
-            return 0
+    # Calculate the sideways range using vectorized operations
+    sideways = np.where((rangemaxprice < sw_df['UPB']) & (rangemaxprice > sw_df['LPB']) & (rangeminprice < sw_df['UPB']) & (rangeminprice > sw_df['LPB']), 1, 0)
+    sw_df['sideways'] = sideways
 
-    sideways = sw_df[['rangemaxprice', 'rangeminprice', 'UPB', 'LPB']].apply(lambda x: sideways_range(x['rangemaxprice'], x['rangeminprice'], x['UPB'], x['LPB']), axis=1)
+    # Return 1 if the current price is within the Bollinger Bands, the MACD histogram is positive, and the trend is sideways, otherwise return 0
+    def sideways_range(in_bb, macd_p, sideways):
+      if in_bb and macd_p and sideways == 1:
+          return 1
+      else:
+          return 0
+
+    sideways_bb_macd = sw_df[['inBB', 'MACDp', 'sideways']].apply(lambda x: sideways_range(x['inBB'], x['MACDp'], x['sideways']), axis=1)
+
     del sw_df
 
-    return sideways
+    # return sideways, sideways_bb_macd, inBB, MACDp
+    return sideways_bb_macd
 
 def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     iday = df.tail(CANDLE_PLOT)

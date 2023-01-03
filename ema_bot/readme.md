@@ -6,6 +6,7 @@ open futures order by cross signal between fast and slow indicator
 
 ## v1.4.8
 - detect sideway by ค่าเฉลี่ย high row (n periods) และ ATR 14
+- เพิ่มการ confirm sideway ด้วย BBands และ MACD
 
 ## v1.4.7
 - เพิ่มการใช้ MACD ในการเปิด position
@@ -201,7 +202,7 @@ open futures order by cross signal between fast and slow indicator
 # download
 
 ## v1.4.8 (testing)
-- https://mega.nz/file/fdwjGQxR#IHTb4o7xvxfcB-shTe6iwbQqe2CUofanPVTpzWxHNAE
+- https://mega.nz/file/DdRgnLID#bI-k7A7dlTkZIj3UE9-v0eBO7S6C4bdXyU_0VWgXch4
 
 ## v1.4.7 
 - https://mega.nz/file/6IZQjDqL#H1kNAf6YO9IWuMc0nRv8BrDKtkmB_uiNU-TGE0lGP9w
