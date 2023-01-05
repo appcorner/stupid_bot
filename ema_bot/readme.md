@@ -4,6 +4,11 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.9
+- คำนวน Activation Price จาก SL (RR1 by @vaz)
+- คำนวน Callback Rate จาก TP หรือ SL
+- ปรับปรุง setting สำหรับ detect sideway
+
 ## v1.4.8
 - detect sideway by ค่าเฉลี่ย high row (n periods) และ ATR 14
 - เพิ่มการ confirm sideway ด้วย BBands และ MACD
@@ -86,6 +91,8 @@ open futures order by cross signal between fast and slow indicator
     ;SWING_TEST = 2
     ;# level ของ fibo ที่ใช้ในการคิด TP
     ;TP_FIBO = 2
+    ;# คำนวน callback rate จาก 1 = TP, 2 = SL
+    ;CB_AUTO_MODE = 1
 
     [setting]
     ;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d
@@ -154,8 +161,14 @@ open futures order by cross signal between fast and slow indicator
     ;# สำหรับคำนวน rsi, 14 คือค่ามาตราฐาน
     rsi_period = 14
 
+    ;# กำหนด on/off สำหรับตรวจสอบ sideway
     detect_sideway = on
+    ;# mode 1 = ATR 14 + AVG high row (n periods)
+    ;# mode 2 = mode 1 + BBands + MACD histogram
+    sideway_mode = 2
+    ;# ค่าตัวคูณ ATR14 เพื่อกำหนด Upper และ Lower จากค่าเฉลี่ย
     atr_multiple = 1.5
+    ;# จำนวน tf n แท่ง ที่ใช้คำนวน ค่าเฉลี่ยของ High, Low และ Bollinger Bands
     rolling_period = 15
 
     [symbols_setting]

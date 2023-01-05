@@ -96,6 +96,7 @@ if UB_TIMER_MODE < 0 or UB_TIMER_MODE > 5:
 SWING_TF = get_int('app_config', 'SWING_TF', 5)
 SWING_TEST = get_int('app_config', 'SWING_TEST', 2)
 TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
+CB_AUTO_MODE = get_int('app_config', 'CB_AUTO_MODE', 1)
 
 #------------------------------------------------------------
 # setting
@@ -149,15 +150,15 @@ if Callback_Long > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_Long = 5.0
 elif Callback_Long < 0.1:
-    print(f'callback rate ranges from 0.1% to 5%, set to 0.1%')
-    Callback_Long = 0.1
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_Long = 0.0
 Callback_Short = get_float('setting', 'callback_short', 5.0)
 if Callback_Short > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_Short = 5.0
 elif Callback_Short < 0.1:
-    print(f'callback rate ranges from 0.1% to 5%, set to 0.1%')
-    Callback_Short = 0.1
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_Short = 0.0
 
 Active_TL_Long = get_float('setting', 'active_tl_long', 10.0)
 Active_TL_Short = get_float('setting', 'active_tl_short', 10.0)
@@ -177,6 +178,7 @@ MACD_SIGNAL = get_int('setting', 'macd_signal')
 RSI_PERIOD = get_int('setting', 'rsi_period')
 
 isDetectSideway = get_str('setting', 'detect_sideway', 'on') == 'on'
+SidewayMode = get_int('setting', 'sideway_mode', 2)
 ATRMultiple = get_float('setting', 'atr_multiple', 1.5)
 RollingPeriod = get_int('setting', 'rolling_period', 15)
 
@@ -202,15 +204,15 @@ if Callback_PNL_Long > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_PNL_Long = 5.0
 elif Callback_PNL_Long < 0.1:
-    print(f'callback rate ranges from 0.1% to 5%, set to 0.1%')
-    Callback_PNL_Long = 0.1
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_PNL_Long = 0.0
 Callback_PNL_Short = get_float('mm', 'callback_pnl_short', 5.0)
 if Callback_PNL_Short > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_PNL_Short = 5.0
 elif Callback_PNL_Short < 0.1:
-    print(f'callback rate ranges from 0.1% to 5%, set to 0.1%')
-    Callback_PNL_Short = 0.1
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_PNL_Short = 0.0
 
 Active_TL_PNL_Long = get_float('mm', 'active_tl_pnl_long', 0.0)
 Active_TL_PNL_Short = get_float('mm', 'active_tl_pnl_short', 0.0)
@@ -221,5 +223,7 @@ TP_Profit_Long = get_float('mm', 'tp_profit_long', 0.0)
 SL_Profit_Long = get_float('mm', 'sl_profit_long', 0.0)
 TP_Profit_Short = get_float('mm', 'tp_profit_short', 0.0)
 SL_Profit_Short = get_float('mm', 'sl_profit_short', 0.0)
+
+Clear_Magin = get_float('mm', 'clear_margin', 0.01)
 
 Loss_Limit = get_int('mm', 'loss_limit', 0)

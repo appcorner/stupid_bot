@@ -25,6 +25,7 @@ UB_TIMER_MODE = 4
 ;SWING_TF = 5
 ;SWING_TEST = 2
 ;TP_FIBO = 2
+;CB_AUTO_MODE = 1
 
 [setting]
 ;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d
@@ -100,8 +101,14 @@ macd_signal = 9
 ;# สำหรับคำนวน rsi, 14 คือค่ามาตราฐาน
 rsi_period = 14
 
+;# กำหนด on/off สำหรับตรวจสอบ sideway
 detect_sideway = on
+;# mode 1 = ATR 14 + AVG high row (n periods)
+;# mode 2 = mode 1 + BBands + MACD histogram
+sideway_mode = 2
+;# ค่าตัวคูณ ATR14 เพื่อกำหนด Upper และ Lower จากค่าเฉลี่ย
 atr_multiple = 1.5
+;# จำนวน tf n แท่ง ที่ใช้คำนวน ค่าเฉลี่ยของ High, Low และ Bollinger Bands
 rolling_period = 15
 
 [symbols_setting]
