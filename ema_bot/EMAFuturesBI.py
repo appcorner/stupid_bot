@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import pandas_ta as ta
 import time
-import mplfinance as mpf 
+import mplfinance as mpf
+import matplotlib.pyplot as plt
 from LineNotify import LineNotify
 import config
 import os
@@ -435,6 +436,8 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
 
     fig.savefig(filename)
 
+    plt.close(fig)
+
     notify.Send_Image(msg, image_path=filename)
     # await sleep(2)
     if config.RemovePlot:
@@ -778,6 +781,7 @@ async def short_TLSTOP(exchange, symbol, amount: float, priceTL: float, callback
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
     logger.debug(order)
     activatePrice = float(order['info']['activatePrice'])
+    logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, activatePrice:{activatePrice}, callbackRate:{callbackRate}')
     await sleep(1)
     return activatePrice
 #-------------------------------------------------------------------------------
@@ -801,7 +805,8 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
     #     # amount = priceEntry * minAmount / float(leverage) * 1.1
     #     amount =  minCost / float(leverage) / priceEntry * 1.1 
     else:
-        amount = (float(balance_entry)/100) * costAmount * float(leverage) / priceEntry
+        # amount = (float(balance_entry)/100) * costAmount * float(leverage) / priceEntry
+        amount = (float(balalce_total)/100) * costAmount * float(leverage) / priceEntry
 
     amount = round(amount, NUM_OF_DECIMALS)
 
@@ -1117,7 +1122,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     else:
                         notify_msg.append(f'Call Back: {callbackShort:.2f}%')
 
-                    activatePrice = await short_TLSTOP(exchange, symbol, amount, priceTL, callbackShort)
+                    activatePrice = await short_TLSTOP(exchange, symbol, amount, activationPrice, callbackShort)
                     print(f'[{symbol}] Set Trailing Stop {activatePrice:.5f}')
                     # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
 
