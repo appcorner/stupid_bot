@@ -277,8 +277,12 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             # maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
             maxidx = iday_minmax.index.get_loc(maximum_index)
             # print(maxidx)
-            new_minimum_index = iday_minmax['low'].iloc[maxidx:].idxmin()
-            new_minimum_price = iday_minmax['low'].iloc[maxidx:].min()
+            if maxidx < len(iday_minmax):
+                new_minimum_index = iday_minmax['low'].iloc[maxidx+1:].idxmin()
+                new_minimum_price = iday_minmax['low'].iloc[maxidx+1:].min()
+            else:
+                new_minimum_index = iday_minmax['low'].iloc[maxidx:].idxmin()
+                new_minimum_price = iday_minmax['low'].iloc[maxidx:].min()
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((maximum_index,maximum_price))
             minmax_points.append((new_minimum_index,new_minimum_price))
@@ -308,8 +312,12 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             # minidx = np.where(iday_minmax.index==minimum_index)[0][0]
             minidx = iday_minmax.index.get_loc(minimum_index)
             # print(maxidx)
-            new_maximum_index = iday_minmax['high'].iloc[minidx:].idxmax()
-            new_maximum_price = iday_minmax['high'].iloc[minidx:].max()
+            if minidx < len(iday_minmax):
+                new_maximum_index = iday_minmax['high'].iloc[minidx+1:].idxmax()
+                new_maximum_price = iday_minmax['high'].iloc[minidx+1:].max()
+            else:
+                new_maximum_index = iday_minmax['high'].iloc[minidx:].idxmax()
+                new_maximum_price = iday_minmax['high'].iloc[minidx:].max()
             minmax_points.append((maximum_index,maximum_price))
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((new_maximum_index,new_maximum_price))
