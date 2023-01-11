@@ -32,7 +32,7 @@ UB_TIMER_MODE = 4
 timeframe = 1h
 ;# กำหนดสัญญานที่แท่ง -1 หรือ -2 เท่านั้น, default = -2
 signal_index = -2
-;# กำหนดค่าเป็น USDT, BUSD
+;# กำหนดค่าเป็น USDT, BUSD แยกหรือรวมกันได้
 margin_type = USDT
 
 ;# ระบุ symbol ที่ต้องการใน watch_list, back_list และต้องสอดคล้องกับ margin_type

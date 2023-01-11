@@ -97,6 +97,7 @@ SWING_TF = get_int('app_config', 'SWING_TF', 5)
 SWING_TEST = get_int('app_config', 'SWING_TEST', 2)
 TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
 CB_AUTO_MODE = get_int('app_config', 'CB_AUTO_MODE', 1)
+START_TRADE_TF = get_str('app_config', 'START_TRADE_TF', '4h')
 
 #------------------------------------------------------------
 # setting
@@ -107,7 +108,8 @@ SignalIndex = get_int('setting', 'signal_index', -2)
 if SignalIndex > -1 or SignalIndex < -2:
     SignalIndex = -2
 
-MarginType = get_str('setting', 'margin_type', 'USDT')
+# MarginType = get_str('setting', 'margin_type', 'USDT')
+MarginType = get_list('setting', 'margin_type', ['USDT'])
 
 watch_list = get_list('setting', 'watch_list')
 back_list = get_list('setting', 'back_list')
