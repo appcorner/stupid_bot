@@ -24,7 +24,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4.9'
+bot_name = 'EMA Futures (Binance) version 1.4.10'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -89,9 +89,6 @@ CSV_COLUMNS = [
         "slow_value"
         ]
 
-NUM_OF_DECIMALS = 7
-# getcontext().prec = NUM_OF_DECIMALS
-
 # ----------------------------------------------------------------------------
 # global variable
 # ----------------------------------------------------------------------------
@@ -129,6 +126,15 @@ def getExchange():
     if config.SANDBOX:
         exchange.set_sandbox_mode(True)
     return exchange
+
+def amount_to_precision(symbol, amount_value):
+    precision_amount = all_symbols[symbol]['precision']['amount']
+    amount = round(amount_value, precision_amount)
+    return amount
+def price_to_precision(symbol, price_value):
+    precision_price = all_symbols[symbol]['precision']['price']
+    price = round(price_value, precision_price)
+    return price
 
 def detect_sideway_trend(df, atr_multiple=1.5, n=15, mode='2'):
     sw_df = df.copy()
@@ -268,16 +274,16 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             minmax_points.append((maximum_index,maximum_price))
             minmax_points.append((minimum_index,minimum_price))
             for idx, fibo_val in enumerate(fibo_values):
-                fibo_level = minimum_price + difference * fibo_val
+                fibo_level = price_to_precision(symbol, minimum_price + difference * fibo_val)
                 fibo_levels.append(fibo_level)
                 if tp == 0.0 and closePrice < fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
-                    tp = minimum_price + difference * fibo_values[tp_fibo]
+                    tp = price_to_precision(symbol, minimum_price + difference * fibo_values[tp_fibo])
         else:
             # maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
             maxidx = iday_minmax.index.get_loc(maximum_index)
             # print(maxidx)
-            if maxidx < len(iday_minmax):
+            if maxidx < len(iday_minmax)-1:
                 new_minimum_index = iday_minmax['low'].iloc[maxidx+1:].idxmin()
                 new_minimum_price = iday_minmax['low'].iloc[maxidx+1:].min()
             else:
@@ -287,11 +293,11 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             minmax_points.append((maximum_index,maximum_price))
             minmax_points.append((new_minimum_index,new_minimum_price))
             for idx, fibo_val in enumerate(fibo_values):
-                fibo_level = new_minimum_price + difference * fibo_val
+                fibo_level = price_to_precision(symbol, new_minimum_price + difference * fibo_val)
                 fibo_levels.append(fibo_level)
                 if tp == 0.0 and closePrice < fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
-                    tp = new_minimum_price + difference * fibo_values[tp_fibo]
+                    tp = price_to_precision(symbol, new_minimum_price + difference * fibo_values[tp_fibo])
                 
         sl = min(swing_lows[-config.SWING_TEST:])
 
@@ -303,16 +309,16 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((maximum_index,maximum_price))
             for idx, fibo_val in enumerate(fibo_values):
-                fibo_level = maximum_price - difference * fibo_val
+                fibo_level = price_to_precision(symbol, maximum_price - difference * fibo_val)
                 fibo_levels.append(fibo_level)
                 if tp == 0.0 and closePrice > fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
-                    tp = maximum_price - difference * fibo_values[tp_fibo]
+                    tp = price_to_precision(symbol, maximum_price - difference * fibo_values[tp_fibo])
         else:
             # minidx = np.where(iday_minmax.index==minimum_index)[0][0]
             minidx = iday_minmax.index.get_loc(minimum_index)
             # print(maxidx)
-            if minidx < len(iday_minmax):
+            if minidx < len(iday_minmax)-1:
                 new_maximum_index = iday_minmax['high'].iloc[minidx+1:].idxmax()
                 new_maximum_price = iday_minmax['high'].iloc[minidx+1:].max()
             else:
@@ -322,11 +328,11 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             minmax_points.append((minimum_index,minimum_price))
             minmax_points.append((new_maximum_index,new_maximum_price))
             for idx, fibo_val in enumerate(fibo_values):
-                fibo_level = new_maximum_price - difference * fibo_val
+                fibo_level = price_to_precision(symbol, new_maximum_price - difference * fibo_val)
                 fibo_levels.append(fibo_level)
                 if tp == 0.0 and closePrice > fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
-                    tp = new_maximum_price - difference * fibo_values[tp_fibo]
+                    tp = price_to_precision(symbol, new_maximum_price - difference * fibo_values[tp_fibo])
                     
         sl = max(swing_highs[-config.SWING_TEST:])
 
@@ -351,105 +357,117 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     }
 
 async def line_chart(symbol, df, msg, pd='', fibo_data=None):
-    data = df.tail(CANDLE_PLOT)
+    try:
+        print(f"{symbol} create line_chart")
+        data = df.tail(CANDLE_PLOT)
 
-    showFibo = fibo_data != None and 'exit' not in pd.lower()
+        showFibo = fibo_data != None and 'exit' not in pd.lower()
 
-    colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
-    added_plots = [
-        mpf.make_addplot(data['fast'],color='red',width=0.5),
-        mpf.make_addplot(data['mid'],color='orange',width=0.5),
-        mpf.make_addplot(data['slow'],color='green',width=0.5),
-        mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue',width=0.75,ylabel=f"RSI ({config.RSI_PERIOD})"),
-        mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
-        mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
-        mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
-        mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors,ylabel=f"MACD"),
-        mpf.make_addplot(data['MACDs'],panel=3,color='blue',width=0.75),
-    ]
+        colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
+        added_plots = [
+            mpf.make_addplot(data['fast'],color='red',width=0.5),
+            mpf.make_addplot(data['mid'],color='orange',width=0.5),
+            mpf.make_addplot(data['slow'],color='green',width=0.5),
+            mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue',width=0.75,
+                ylabel=f"RSI ({config.RSI_PERIOD})", y_on_right=False),
+            mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+            mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+            mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
+            mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors,
+                ylabel=f"MACD", y_on_right=True),
+            mpf.make_addplot(data['MACDs'],panel=3,color='blue',width=0.75),
+        ]
 
-    kwargs = dict(
-        volume=True,volume_panel=1,
-        figscale=1.2,
-        figratio=(8, 7),
-        panel_ratios=(8,2,2,2),
-        addplot=added_plots,
-        # tight_layout=True,
-        # scale_padding={'left': 0.5, 'top': 2.5, 'right': 2.5, 'bottom': 0.75},
-        scale_padding={'left': 0.5, 'top': 0.6, 'right': 1.0, 'bottom': 0.5},
+        kwargs = dict(
+            figscale=1.2,
+            figratio=(8, 7),
+            panel_ratios=(8,2,2,2),
+            addplot=added_plots,
+            # tight_layout=True,
+            # scale_padding={'left': 0.5, 'top': 2.5, 'right': 2.5, 'bottom': 0.75},
+            scale_padding={'left': 0.5, 'top': 0.6, 'right': 1.0, 'bottom': 0.5},
+            )
+
+        fibo_title = ''
+
+        if showFibo:
+            fibo_colors = ['red','brown','orange','gold','green','blue','gray','purple','purple','purple']
+            logger.debug(fibo_data)
+            # fibo_colors.append('g')
+            # fibo_data['fibo_levels'].append(fibo_data['swing_highs'][0])
+            # fibo_colors.append('r')
+            # fibo_data['fibo_levels'].append(fibo_data['swing_lows'][0])
+            fibo_lines = dict(
+                hlines=fibo_data['fibo_levels'],
+                colors=fibo_colors,
+                alpha=0.5,
+                linestyle='-.',
+                linewidths=1,
+                )
+            tpsl_colors = ['g','r']
+            tpsl_data = [fibo_data['tp'], fibo_data['sl']]
+            tpsl_lines = dict(
+                hlines=tpsl_data,
+                colors=tpsl_colors,
+                alpha=0.5,
+                linestyle='-.',
+                linewidths=1,
+                )
+            minmax_lines = dict(
+                alines=fibo_data['min_max'],
+                colors='black',
+                linestyle='--',
+                linewidths=0.1,
+                )
+            fibo_title = ' fibo-'+fibo_data['fibo_type'][0:2]
+            kwargs['hlines']=tpsl_lines
+            kwargs['alines']=minmax_lines
+
+        myrcparams = {'axes.labelsize':10,'xtick.labelsize':8,'ytick.labelsize':8}
+        mystyle = mpf.make_mpf_style(base_mpf_style='charles',rc=myrcparams)
+
+        filename = f"./plots/order_{symbol}.png"
+        fig, axlist = mpf.plot(
+            data,
+            volume=True,volume_panel=1,
+            **kwargs,
+            type="candle",
+            xrotation=0,
+            ylabel='Price',
+            style=mystyle,
+            returnfig=True,
         )
+        # print(axlist)
+        ax1,*_ = axlist
 
-    fibo_title = ''
+        title = ax1.set_title(f'{symbol} {pd} ({config.timeframe} @ {data.index[-1]}{fibo_title})')
+        title.set_fontsize(14)
 
-    if showFibo:
-        fibo_colors = ['red','brown','orange','gold','green','blue','gray','purple','purple','purple']
-        logger.debug(fibo_data)
-        # fibo_colors.append('g')
-        # fibo_data['fibo_levels'].append(fibo_data['swing_highs'][0])
-        # fibo_colors.append('r')
-        # fibo_data['fibo_levels'].append(fibo_data['swing_lows'][0])
-        fibo_lines = dict(
-            hlines=fibo_data['fibo_levels'],
-            colors=fibo_colors,
-            alpha=0.5,
-            linestyle='-.',
-            linewidths=1,
-            )
-        tpsl_colors = ['g','r']
-        tpsl_data = [fibo_data['tp'], fibo_data['sl']]
-        tpsl_lines = dict(
-            hlines=tpsl_data,
-            colors=tpsl_colors,
-            alpha=0.5,
-            linestyle='-.',
-            linewidths=1,
-            )
-        minmax_lines = dict(
-            alines=fibo_data['min_max'],
-            colors='black',
-            linestyle='--',
-            linewidths=0.1,
-            )
-        fibo_title = ' fibo-'+fibo_data['fibo_type'][0:2]
-        kwargs['hlines']=tpsl_lines
-        kwargs['alines']=minmax_lines
+        if showFibo:
+            difference = fibo_data['difference']
+            fibo_levels = fibo_data['fibo_levels']
+            for idx, fibo_val in enumerate(fibo_data['fibo_values']):
+                ax1.text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
 
-    myrcparams = {'axes.labelsize':10,'xtick.labelsize':8,'ytick.labelsize':8}
-    mystyle = mpf.make_mpf_style(base_mpf_style='charles',rc=myrcparams)
+            fibo_tp = fibo_data['tp']
+            fibo_tp_txt = fibo_data['tp_txt']
+            ax1.text(CANDLE_PLOT,fibo_tp - difference * 0.04,fibo_tp_txt,fontsize=8,color='g',horizontalalignment='right')
+            fibo_sl = fibo_data['sl']
+            fibo_sl_txt = fibo_data['sl_txt']
+            ax1.text(CANDLE_PLOT,fibo_sl - difference * 0.04,fibo_sl_txt,fontsize=8,color='r',horizontalalignment='right')
 
-    filename = f"./plots/order_{symbol}.png"
-    fig, axlist = mpf.plot(
-        data,
-        **kwargs,
-        type="candle",
-        style=mystyle,
-        returnfig=True,
-    )
+        fig.savefig(filename)
 
-    title = axlist[0].set_title(f'{symbol} {pd} ({config.timeframe} @ {data.index[-1]}{fibo_title})')
-    title.set_fontsize(14)
+        plt.close(fig)
 
-    if showFibo:
-        difference = fibo_data['difference']
-        fibo_levels = fibo_data['fibo_levels']
-        for idx, fibo_val in enumerate(fibo_data['fibo_values']):
-            axlist[0].text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]:.5f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
+        notify.Send_Image(msg, image_path=filename)
+        # await sleep(2)
+        if config.RemovePlot:
+            os.remove(filename)
 
-        fibo_tp = fibo_data['tp']
-        fibo_tp_txt = fibo_data['tp_txt']
-        axlist[0].text(CANDLE_PLOT,fibo_tp - difference * 0.04,fibo_tp_txt,fontsize=8,color='g',horizontalalignment='right')
-        fibo_sl = fibo_data['sl']
-        fibo_sl_txt = fibo_data['sl_txt']
-        axlist[0].text(CANDLE_PLOT,fibo_sl - difference * 0.04,fibo_sl_txt,fontsize=8,color='r',horizontalalignment='right')
-
-    fig.savefig(filename)
-
-    plt.close(fig)
-
-    notify.Send_Image(msg, image_path=filename)
-    # await sleep(2)
-    if config.RemovePlot:
-        os.remove(filename)
+    except Exception as ex:
+        print(type(ex).__name__, symbol, str(ex))
+        logger.exception(f'line_chart {symbol}')
 
     return
 
@@ -558,7 +576,7 @@ def add_indicator(symbol, bars):
         df["RSI"] = ta.rsi(df['close'],config.RSI_PERIOD)
 
     except Exception as ex:
-        print(type(ex).__name__, str(ex))
+        print(type(ex).__name__, symbol, str(ex))
         logger.exception(f'add_indicator {symbol}')
 
     return df
@@ -585,17 +603,17 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             all_candles[symbol] = add_indicator(symbol, ohlcv_bars)
             # print(symbol)
     except Exception as ex:
-        print(type(ex).__name__, str(ex))
+        print(type(ex).__name__, symbol, str(ex))
         logger.exception(f'fetch_ohlcv {symbol}')
-        notify.Send_Text(f'แจ้งปัญหาเหรียญ {symbol}:\nการอ่านแท่งเทียนผิดพลาด: {ex}')
+        notify.Send_Text(f'แจ้งปัญหาเหรียญ {symbol}:\nการอ่านแท่งเทียนผิดพลาด: {str(ex)}')
         if limit == 0 and symbol in all_candles.keys():
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
 
-async def set_leverage(exchange, symbol, marginType):
+async def set_leverage(exchange, symbol):
     try:
         if config.automaxLeverage == "on":
             symbol_ccxt = all_symbols[symbol]['symbol']
-            params  = {"settle": marginType}
+            params  = {"settle": all_symbols[symbol]['quote']}
             lv_tiers = await exchange.fetchLeverageTiers([symbol], params=params)
             leverage = int(lv_tiers[symbol_ccxt][0]['maxLeverage'])
             # print(symbol, symbol_ccxt, leverage)
@@ -760,14 +778,14 @@ async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, clo
 #       and the latest price <= the highest price * (1 - callbackRate)
 # SELL: activationPrice should be larger than latest price.
 #-------------------------------------------------------------------------------
-async def long_TLSTOP(exchange, symbol, amount: float, priceTL: float, callbackRate: float):
+async def long_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
     params = {
         'quantityIsRequired': False, 
         'callbackRate': callbackRate, 
         'reduceOnly': True
     }
     if priceTL > 0:
-        params['activationPrice'] = float(priceTL)
+        params['activationPrice'] = priceTL
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate:{callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
     logger.debug(order)
@@ -776,14 +794,14 @@ async def long_TLSTOP(exchange, symbol, amount: float, priceTL: float, callbackR
     await sleep(1)
     return activatePrice
 #-------------------------------------------------------------------------------
-async def short_TLSTOP(exchange, symbol, amount: float, priceTL: float, callbackRate: float):
+async def short_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
     params = {
         'quantityIsRequired': False, 
         'callbackRate': callbackRate, 
         'reduceOnly': True
     }
     if priceTL > 0:
-        params['activationPrice'] = float(priceTL)
+        params['activationPrice'] = priceTL
 
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
@@ -816,12 +834,12 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
         # amount = (float(balance_entry)/100) * costAmount * float(leverage) / priceEntry
         amount = (float(balalce_total)/100) * costAmount * float(leverage) / priceEntry
 
-    amount = round(amount, NUM_OF_DECIMALS)
+    amount = amount_to_precision(symbol, amount)
 
     logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} amt:{amount}')
 
     return (float(priceEntry), float(amount))
-
+        
 async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade, count_trade_long, count_trade_short
 
@@ -943,7 +961,6 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 TPCloseLong = float(symbols_setting.loc[symbol]['tp_close_long'])
                 SLLong = float(symbols_setting.loc[symbol]['sl_long'])
                 callbackLong = float(symbols_setting.loc[symbol]['callback_long'])
-                # callbackLong = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_long'].split(',')][0]
                 activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
 
             print(f'{symbol:12} LONG')
@@ -959,7 +976,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify_msg.append(f'สถานะ : Long\nCross Up\nราคา : {priceEntry:.5f}')
+                notify_msg.append(f'สถานะ : Long\nCross Up\nราคา : {priceEntry}')
 
                 logger.debug(f'{symbol} LONG\n{df.tail(3)}')
 
@@ -969,50 +986,50 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     notify_msg.append(f'# TPSL')
                     if config.TP_PNL_Long > 0:
                         closeRate = config.TP_PNL_Close_Long
-                        pricetp = round(priceEntry + (config.TP_PNL_Long / amount), NUM_OF_DECIMALS)
-                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}'
+                        pricetp = price_to_precision(symbol, priceEntry + (config.TP_PNL_Long / amount))
+                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}'
                         fibo_data['tp'] = pricetp
-                        notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp:.5f}')
+                        notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}')
                         if config.Active_TL_PNL_Long > 0:
-                            priceTL = round(priceEntry + (config.Active_TL_PNL_Long / amount), NUM_OF_DECIMALS)
+                            priceTL = price_to_precision(symbol, priceEntry + (config.Active_TL_PNL_Long / amount))
                         callbackLong = config.Callback_PNL_Long
                     else:
                         closeRate = TPCloseLong
                         if TPLong > 0:
-                            pricetp = round(priceEntry + (priceEntry * (TPLong / 100.0)), NUM_OF_DECIMALS)
-                            fibo_data['tp_txt'] = f'TP: {TPLong:.2f}% @{pricetp:.5f}'
+                            pricetp = price_to_precision(symbol, priceEntry + (priceEntry * (TPLong / 100.0)))
+                            fibo_data['tp_txt'] = f'TP: {TPLong:.2f}% @{pricetp}'
                             fibo_data['tp'] = pricetp
-                            notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp:.5f}')
+                            notify_msg.append(f'TP: {TPLong:.2f}% @{pricetp}')
                         else:
                             pricetp = fibo_data['tp']
-                            fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp:.5f}'
-                            notify_msg.append(f'TP: (AUTO) @{pricetp:.5f}')
+                            fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
+                            notify_msg.append(f'TP: (AUTO) @{pricetp}')
                         if activeTLLong > 0:
-                            priceTL = round(priceEntry + (priceEntry * (activeTLLong / 100.0)), NUM_OF_DECIMALS)
+                            priceTL = price_to_precision(symbol, priceEntry + (priceEntry * (activeTLLong / 100.0)))
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Long > 0:
-                        pricesl = round(priceEntry - (config.SL_PNL_Long / amount), NUM_OF_DECIMALS)
-                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}'
+                        pricesl = price_to_precision(symbol, priceEntry - (config.SL_PNL_Long / amount))
+                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}'
                         fibo_data['sl'] = pricesl
-                        notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl:.5f}')
+                        notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}')
                     elif SLLong > 0:
-                        pricesl = round(priceEntry - (priceEntry * (SLLong / 100.0)), NUM_OF_DECIMALS)
-                        fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl:.5f}'
+                        pricesl = price_to_precision(symbol, priceEntry - (priceEntry * (SLLong / 100.0)))
+                        fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl}'
                         fibo_data['sl'] = pricesl
-                        notify_msg.append(f'SL: {SLLong:.2f}% @{pricesl:.5f}')
+                        notify_msg.append(f'SL: {SLLong:.2f}% @{pricesl}')
                     else:
                         pricesl = fibo_data['sl']
-                        fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl:.5f}'
-                        notify_msg.append(f'SL: (AUTO) @{pricesl:.5f}')
+                        fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl}'
+                        notify_msg.append(f'SL: (AUTO) @{pricesl}')
 
                     await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
-                    print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
+                    print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
                     
                 if trailingStopMode == 'on' and closeRate < 100.0:
                     notify_msg.append('# TrailingStop')
                     if priceTL == 0.0:
                         # RR = 1
-                        activationPrice = round(priceEntry + abs(priceEntry - pricesl), NUM_OF_DECIMALS)
+                        activationPrice = price_to_precision(symbol, priceEntry + abs(priceEntry - pricesl))
                     else:
                         activationPrice = priceTL
 
@@ -1027,11 +1044,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     # callbackLong_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackLong])
 
                     if priceTL == 0.0:
-                        notify_msg.append(f'Active Price: (AUTO) @{activatePrice:.5f}')
+                        notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
                     elif config.TP_PNL_Long > 0:
-                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f} @{activatePrice:.5f}')
+                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f} @{activatePrice}')
                     elif activeTLLong > 0:
-                        notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice:.5f}')
+                        notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice}')
 
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG', fibo_data) )
                 
@@ -1051,7 +1068,6 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 TPCloseShort = float(symbols_setting.loc[symbol]['tp_close_short'])
                 SLShort = float(symbols_setting.loc[symbol]['sl_short'])
                 callbackShort = float(symbols_setting.loc[symbol]['callback_short'])
-                # callbackShort = [float(x.strip()) for x in symbols_setting.loc[symbol]['callback_short'].split(',')][0]
                 activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
 
             print(f'{symbol:12} SHORT')
@@ -1067,7 +1083,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
-                notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry:.5f}')
+                notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry}')
 
                 logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
             
@@ -1077,50 +1093,50 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     notify_msg.append(f'# TPSL')
                     if config.TP_PNL_Short > 0:
                         closeRate = config.TP_PNL_Close_Short
-                        pricetp = round(priceEntry - (config.TP_PNL_Short / amount), NUM_OF_DECIMALS)
-                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}'
+                        pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
+                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}'
                         fibo_data['tp'] = pricetp
-                        notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp:.5f}')
+                        notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}')
                         if config.Active_TL_PNL_Short > 0:
-                            priceTL = round(priceEntry - (config.Active_TL_PNL_Short / amount), NUM_OF_DECIMALS)
+                            priceTL = price_to_precision(symbol, priceEntry - (config.Active_TL_PNL_Short / amount))
                         callbackShort = config.Callback_PNL_Short
                     else:
                         closeRate = TPCloseShort
                         if TPShort > 0:
-                            pricetp = round(priceEntry - (priceEntry * (TPShort / 100.0)), NUM_OF_DECIMALS)
-                            fibo_data['tp_txt'] = f'TP: {TPShort:.2f}% @{pricetp:.5f}'
+                            pricetp = price_to_precision(symbol, priceEntry - (priceEntry * (TPShort / 100.0)))
+                            fibo_data['tp_txt'] = f'TP: {TPShort:.2f}% @{pricetp}'
                             fibo_data['tp'] = pricetp
-                            notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp:.5f}')
+                            notify_msg.append(f'TP: {TPShort:.2f}% @{pricetp}')
                         else:
                             pricetp = fibo_data['tp']
-                            fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp:.5f}'
-                            notify_msg.append(f'TP: (AUTO) @{pricetp:.5f}')
+                            fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
+                            notify_msg.append(f'TP: (AUTO) @{pricetp}')
                         if activeTLShort > 0:
-                            priceTL = round(priceEntry - (priceEntry * (activeTLShort / 100.0)), NUM_OF_DECIMALS)
+                            priceTL = price_to_precision(symbol, priceEntry - (priceEntry * (activeTLShort / 100.0)))
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Short > 0:
-                        pricesl = round(priceEntry + (config.SL_PNL_Short / amount), NUM_OF_DECIMALS)
-                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl:.5f}'
+                        pricesl = price_to_precision(symbol, priceEntry + (config.SL_PNL_Short / amount))
+                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl}'
                         fibo_data['sl'] = pricesl
-                        notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl:.5f}')
+                        notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl}')
                     elif SLShort > 0:
-                        pricesl = round(priceEntry + (priceEntry * (SLShort / 100.0)), NUM_OF_DECIMALS)
-                        fibo_data['sl_txt'] = f'SL: {SLShort:.2f}% @{pricesl:.5f}'
+                        pricesl = price_to_precision(symbol, priceEntry + (priceEntry * (SLShort / 100.0)))
+                        fibo_data['sl_txt'] = f'SL: {SLShort:.2f}% @{pricesl}'
                         fibo_data['sl'] = pricesl
-                        notify_msg.append(f'SL: {SLShort:.2f}% @{pricesl:.5f}')
+                        notify_msg.append(f'SL: {SLShort:.2f}% @{pricesl}')
                     else:
                         pricesl = fibo_data['sl']
-                        fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl:.5f}'
-                        notify_msg.append(f'SL: (AUTO) @{pricesl:.5f}')
+                        fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl}'
+                        notify_msg.append(f'SL: (AUTO) @{pricesl}')
 
                     await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
-                    print(f'[{symbol}] Set TP {pricetp:.5f} SL {pricesl:.5f}')
+                    print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
 
                 if trailingStopMode == 'on' and closeRate < 100.0:
                     notify_msg.append('# TrailingStop')
                     if priceTL == 0.0:
                         # RR = 1
-                        activationPrice = round(priceEntry - abs(priceEntry - pricesl), NUM_OF_DECIMALS)
+                        activationPrice = price_to_precision(symbol, priceEntry - abs(priceEntry - pricesl))
                     else:
                         activationPrice = priceTL
                         
@@ -1131,15 +1147,15 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         notify_msg.append(f'Call Back: {callbackShort:.2f}%')
 
                     activatePrice = await short_TLSTOP(exchange, symbol, amount, activationPrice, callbackShort)
-                    print(f'[{symbol}] Set Trailing Stop {activatePrice:.5f}')
+                    print(f'[{symbol}] Set Trailing Stop {activatePrice}')
                     # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
 
                     if priceTL == 0.0:
-                        notify_msg.append(f'Active Price: (AUTO) @{activatePrice:.5f}')
+                        notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
                     elif config.TP_PNL_Short > 0:
-                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f} @{activatePrice:.5f}')
+                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f} @{activatePrice}')
                     elif activeTLShort > 0:
-                        notify_msg.append(f'Active Price: {activeTLShort:.2f}% @{activatePrice:.5f}')
+                        notify_msg.append(f'Active Price: {activeTLShort:.2f}% @{activatePrice}')
 
                 gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT', fibo_data) )
 
@@ -1162,21 +1178,13 @@ async def load_all_symbols():
         # t1=time.time()
         markets = await exchange.fetch_markets()
         # print(markets[0])
-        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits'])
-        mdf.drop(mdf[mdf.quote != config.MarginType].index, inplace=True)
-        # mdf.to_csv("fetch_markets.csv",index=False)
-        # mdf['minAmount'] = mdf['limits'].apply(lambda x: x['amount']['min'])
-        # mdf['minCost'] = mdf['limits'].apply(lambda x: x['cost']['min'])
-        # print(mdf.columns)
-        # print(mdf.head())
-        # drop_value = ['BTCUSDT_221230','ETHUSDT_221230','BTCUSDT_230331']
-        # print(mdf[mdf['id'].str.contains('_')])
-        # print(mdf[mdf['id'].str.contains('_')].index)
+        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits','precision'])
+        mdf.drop(mdf[~mdf.quote.isin(config.MarginType)].index, inplace=True)
         mdf.drop(mdf[mdf['id'].str.contains('_')].index, inplace=True)
-        # print(mdf)
+        # print(mdf.head())
         # all_symbols = {r['id']:{'symbol':r['symbol'],'minAmount':r['minAmount']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minAmount']].to_dict('records')}
         # all_symbols = {r['id']:{'symbol':r['symbol'],'minCost':r['minCost']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minCost']].to_dict('records')}
-        all_symbols = {r['id']:{'symbol':r['symbol']} for r in mdf[['id','symbol']].to_dict('records')}
+        all_symbols = {r['id']:{'symbol':r['symbol'],'quote':r['quote'],'precision':r['precision']} for r in mdf[['id','symbol','quote','precision']].to_dict('records')}
         # print(all_symbols, len(all_symbols))
         # print(all_symbols.keys())
         if len(config.watch_list) > 0:
@@ -1186,9 +1194,10 @@ async def load_all_symbols():
         # remove sysbol if in back_list
         watch_list = list(filter(lambda x: x not in config.back_list, watch_list_tmp))
         # print(watch_list)
+        # print([all_symbols[s] for s in all_symbols.keys() if s in watch_list])
         # t2=(time.time())-t1
         # print(f'ใช้เวลาหาว่ามีเหรียญ เทรดฟิวเจอร์ : {t2:0.2f} วินาที')
-        
+
         print(f'total     : {len(all_symbols.keys())} symbols')
         print(f'target    : {len(watch_list)} symbols')
 
@@ -1206,11 +1215,11 @@ async def set_all_leverage():
         exchange = getExchange()
 
         # set leverage
-        loops = [set_leverage(exchange, symbol, config.MarginType) for symbol in watch_list]
+        loops = [set_leverage(exchange, symbol) for symbol in watch_list]
         await gather(*loops)
         # แสดงค่า leverage
         # print(all_leverage)
-        print(f'#leverage : {len(all_leverage.keys())} symbols')
+        print(f'leverage  : {len(all_leverage.keys())} symbols')
 
         logger.info(f'leverage:{len(all_leverage.keys())}')
 
@@ -1228,7 +1237,7 @@ async def fetch_first_ohlcv():
         # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
         limit = CANDLE_LIMIT
 
-        if TIMEFRAME_SECONDS[config.timeframe] >= TIMEFRAME_SECONDS['4h']:
+        if TIMEFRAME_SECONDS[config.timeframe] >= TIMEFRAME_SECONDS[config.START_TRADE_TF]:
             # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
             loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit) for symbol in watch_list]
             await gather(*loops)
@@ -1262,8 +1271,17 @@ async def fetch_next_ohlcv(next_ticker):
     finally:
         await exchange.close()
 
-async def mm_strategy(exchange, mm_positions):
+async def mm_strategy():
     try:
+        exchange = getExchange()
+
+        balance = await exchange.fetch_balance()
+        ex_positions = balance['info']['positions']
+        mm_positions = [position for position in ex_positions 
+            if position['symbol'] in all_symbols.keys() and
+                all_symbols[position['symbol']]['quote'] in config.MarginType and 
+                float(position['positionAmt']) != 0]
+
         # sumProfit = sum([float(position['unrealizedProfit']) for position in mm_positions])
         sumLongProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) >= 0])
         sumShortProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) < 0])
@@ -1297,8 +1315,19 @@ async def mm_strategy(exchange, mm_positions):
                     # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
                     mm_notify.append(f'{symbol} : MM Short Exit')
                 cancel_loops.append(cancel_order(exchange, symbol))
-            await gather(*exit_loops)
-            await gather(*cancel_loops)
+
+            try:
+                await gather(*cancel_loops)
+            except Exception as ex:
+                print(type(ex).__name__, str(ex))
+                logger.exception('mm_strategy cancel all')
+
+            try:
+                await gather(*exit_loops)
+            except Exception as ex:
+                print(type(ex).__name__, str(ex))
+                logger.exception('mm_strategy exit all')
+
             if len(mm_notify) > 0:
                 txt_notify = '\n'.join(mm_notify)
                 line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
@@ -1324,8 +1353,19 @@ async def mm_strategy(exchange, mm_positions):
                         # line_notify(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
                         mm_notify.append(f'{symbol} : MM Long Exit')
                         cancel_loops.append(cancel_order(exchange, symbol))
-                await gather(*exit_loops)
-                await gather(*cancel_loops)
+
+                try:
+                    await gather(*exit_loops)
+                except Exception as ex:
+                    print(type(ex).__name__, str(ex))
+                    logger.exception('mm_strategy exit long')
+
+                try:
+                    await gather(*cancel_loops)
+                except Exception as ex:
+                    print(type(ex).__name__, str(ex))
+                    logger.exception('mm_strategy cancel long')
+
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
                     line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
@@ -1344,8 +1384,19 @@ async def mm_strategy(exchange, mm_positions):
                         # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
                         mm_notify.append(f'{symbol} : MM Short Exit')
                         cancel_loops.append(cancel_order(exchange, symbol))
-                await gather(*exit_loops)
-                await gather(*cancel_loops)
+
+                try:
+                    await gather(*exit_loops)
+                except Exception as ex:
+                    print(type(ex).__name__, str(ex))
+                    logger.exception('mm_strategy exit short')
+
+                try:
+                    await gather(*cancel_loops)
+                except Exception as ex:
+                    print(type(ex).__name__, str(ex))
+                    logger.exception('mm_strategy cancel short')
+
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
                     line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
@@ -1372,8 +1423,19 @@ async def mm_strategy(exchange, mm_positions):
                     # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
                     mm_notify.append(f'{symbol} : MM Short Remove')
                 cancel_loops.append(cancel_order(exchange, symbol))
-        await gather(*exit_loops)
-        await gather(*cancel_loops)
+
+        try:
+            await gather(*exit_loops)
+        except Exception as ex:
+            print(type(ex).__name__, str(ex))
+            logger.exception('mm_strategy clear exit')
+
+        try:
+            await gather(*cancel_loops)
+        except Exception as ex:
+            print(type(ex).__name__, str(ex))
+            logger.exception('mm_strategy clear cancel')
+
         if len(mm_notify) > 0:
             txt_notify = '\n'.join(mm_notify)
             line_notify(f'\nสถานะ: Margin <= {config.Clear_Magin}\n{txt_notify}')
@@ -1390,15 +1452,24 @@ async def mm_strategy(exchange, mm_positions):
         print(type(ex).__name__, str(ex))
         logger.exception('mm_strategy')
 
-async def update_all_balance(marginType, checkMM=True, notifyLine=False):
+    finally:
+        await exchange.close()
+
+async def update_all_balance(checkMM=True, notifyLine=False):
     global all_positions, balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, orders_history
     try:
         exchange = getExchange()
 
         balance = await exchange.fetch_balance()
+        # print(balance)
         ex_positions = balance['info']['positions']
+        balance_entry = 0.0
+        for marginType in config.MarginType:
+            balance_entry += float(balance[marginType]['free'])
         positions = [position for position in ex_positions 
-            if position['symbol'].endswith(marginType) and float(position['positionAmt']) != 0]
+            if position['symbol'] in all_symbols.keys() and
+                all_symbols[position['symbol']]['quote'] in config.MarginType and 
+                float(position['positionAmt']) != 0]
 
         # sumLongProfit = sum([float(position['unrealizedProfit']) for position in positions if float(position['positionAmt']) >= 0])
         # sumShortProfit = sum([float(position['unrealizedProfit']) for position in positions if float(position['positionAmt']) < 0])
@@ -1413,36 +1484,31 @@ async def update_all_balance(marginType, checkMM=True, notifyLine=False):
         count_trade = len(all_positions)
         count_trade_long = sum(all_positions["pd."].map(lambda x : x == 'LONG'))
         count_trade_short = sum(all_positions["pd."].map(lambda x : x == 'SHORT'))
-        freeBalance =  await exchange.fetch_free_balance()
-        balance_entry = float(freeBalance[marginType])
 
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.2f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
         balalce_total = balance_entry + sumMargin + sumProfit
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
-        if config.Trade_Mode == 'on':
-            # print("all_positions ================")
-            print(all_positions)
-            ub_msg = []
-            ub_msg.append('รายงานสรุป')
-            if config.limit_Trade > 0:
-                ub_msg.append(f"# Count Trade\nLong+Short: {count_trade}/{config.limit_Trade}")
-                print(f"Count Trade ===== {count_trade}/{config.limit_Trade}")
-            else:
-                ub_msg.append(f"# Count Trade\nLong: {count_trade_long}/{config.limit_Trade_Long}\nShort: {count_trade_short}/{config.limit_Trade_Short}")
-                print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
-            ub_msg.append(f"# Balance\nCurrent: {balance_entry:,.4f}\nMargin: {sumMargin:+,.4f}\nProfit: {sumProfit:+,.4f}")
-            ub_msg.append(f"Total: {balalce_total:,.4f}\nChange: {balance_change:+,.4f}")
-            print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.4f} Profit: {sumProfit:+,.4f}")
-            print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
 
-            if notifyLine:
-                notify.Send_Text('\n'.join(ub_msg))
-                
+        # print("all_positions ================")
+        print(all_positions)
+        ub_msg = []
+        ub_msg.append('รายงานสรุป')
+        if config.limit_Trade > 0:
+            ub_msg.append(f"# Count Trade\nLong+Short: {count_trade}/{config.limit_Trade}")
+            print(f"Count Trade ===== {count_trade}/{config.limit_Trade}")
+        else:
+            ub_msg.append(f"# Count Trade\nLong: {count_trade_long}/{config.limit_Trade_Long}\nShort: {count_trade_short}/{config.limit_Trade_Short}")
+            print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
+        ub_msg.append(f"# Balance\nCurrent: {balance_entry:,.4f}\nMargin: {sumMargin:+,.4f}\nProfit: {sumProfit:+,.4f}")
+        ub_msg.append(f"Total: {balalce_total:,.4f}\nChange: {balance_change:+,.4f}")
+        print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.4f} Profit: {sumProfit:+,.4f}")
+        print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
+
+        if notifyLine:
+            notify.Send_Text('\n'.join(ub_msg))
+            
         logger.info(f'countTrade:{count_trade} (L:{count_trade_long},S:{count_trade_short}) balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
-
-        if checkMM:
-            await mm_strategy(exchange,positions)
 
         loops = [cancel_order(exchange, symbol) for symbol in orders_history.keys() if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list()]
         await gather(*loops)
@@ -1457,6 +1523,8 @@ async def update_all_balance(marginType, checkMM=True, notifyLine=False):
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_balance')
+        notify.Send_Text(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {ex}')
+        pass
 
     finally:
         await exchange.close()
@@ -1467,7 +1535,7 @@ async def load_symbols_setting():
         if config.CSV_NAME:
             symbols_setting = pd.read_csv(config.CSV_NAME, skipinitialspace=True)
             if any(x in CSV_COLUMNS for x in symbols_setting.columns.to_list()):
-                symbols_setting.drop(symbols_setting[symbols_setting.margin_type != config.MarginType].index, inplace=True)
+                symbols_setting.drop(symbols_setting[~symbols_setting.margin_type.isin(config.MarginType)].index, inplace=True)
                 symbols_setting['id'] = symbols_setting['symbol']+symbols_setting['margin_type']
                 symbols_setting.set_index('id', inplace=True)
                 # เอาอันซ้ำออก เหลืออันใหม่สุด
@@ -1518,10 +1586,11 @@ async def close_non_position_order(watch_list, positions_list):
 async def main():
     global start_balance_total
 
+    marginList = ','.join(config.MarginType)
     if config.SANDBOX:
-        bot_title = f'{bot_name} - {config.timeframe} - {config.MarginType} (SANDBOX)'
+        bot_title = f'{bot_name} - {config.timeframe} - {marginList} (SANDBOX)'
     else:
-        bot_title = f'{bot_name} - {config.timeframe} - {config.MarginType}'
+        bot_title = f'{bot_name} - {config.timeframe} - {marginList}'
 
     # set cursor At top, left (1,1)
     print(CLS_SCREEN+bot_title)
@@ -1532,12 +1601,8 @@ async def main():
 
     await set_all_leverage()
 
-    # kwargs = dict(
-    #     limitTrade=config.limit_Trade,
-    # )
-    
     # แสดงค่า positions & balance
-    await update_all_balance(config.MarginType, notifyLine=config.SummaryReport)
+    await update_all_balance(notifyLine=config.SummaryReport)
     start_balance_total = balalce_total
 
     time_wait = TIMEFRAME_SECONDS[config.timeframe] # กำหนดเวลาต่อ 1 รอบ
@@ -1571,8 +1636,10 @@ async def main():
 
                 local_time = time.ctime(seconds)
                 print(f'calculate new indicator: {local_time}')
-                
-                await update_all_balance(config.MarginType, notifyLine=config.SummaryReport)
+
+                if config.Trade_Mode == 'on':
+                    await mm_strategy()
+                await update_all_balance(notifyLine=config.SummaryReport)
 
                 t1=time.time()
 
@@ -1592,7 +1659,8 @@ async def main():
                 print(CLS_SCREEN+bot_title)
                 balance_time = time.ctime(seconds)
                 print(f'last indicator: {local_time}, last balance: {balance_time}')
-                await update_all_balance(config.MarginType)
+                await mm_strategy()
+                await update_all_balance()
                 next_ticker_ub += time_wait_ub
 
             await sleep(1)
@@ -1630,8 +1698,8 @@ if __name__ == "__main__":
         print(HIDE_CURSOR, end="")
         loop = get_event_loop()
         # แสดง status waiting ระหว่างที่รอ...
-        loop.create_task(main())
-        loop.run_until_complete(waiting())        
+        loop.create_task(waiting())
+        loop.run_until_complete(main())   
 
     except KeyboardInterrupt:
         print(CLS_LINE+'\rbye')

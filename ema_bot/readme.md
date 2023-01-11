@@ -4,6 +4,10 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.10
+- คำนวน amount, price แยกตาม precision ของแต่ล่ะเหรียญ
+- กำหนด Margin Type แยกหรือรวมกันได้
+
 ## v1.4.9
 - คำนวน Activation Price จาก SL (RR1 by @vaz)
 - คำนวน Callback Rate จาก TP หรือ SL
@@ -99,6 +103,8 @@ open futures order by cross signal between fast and slow indicator
     timeframe = 1m
     ;# กำหนดสัญญานที่แท่ง -1 หรือ -2 เท่านั้น, default = -2
     signal_index = -2
+    ;# กำหนด Margin Type แยกหรือรวมกันได้
+    ;# ต.ย. margin_type = USDT,BUSD
     margin_type = USDT
 
     ;# ระบุ symbol ที่ต้องการใน watch_list, back_list
@@ -213,6 +219,9 @@ open futures order by cross signal between fast and slow indicator
     loss_limit = 0
 
 # download
+
+## v1.4.10
+-
 
 ## v1.4.9
 - https://mega.nz/file/iFoRWCRC#_owOvvQPFemR1TZpb5yrH7jBB08ZFb3wXpdmkJzsAQ0
