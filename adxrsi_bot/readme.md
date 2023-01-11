@@ -2,7 +2,7 @@
 
 ## adxrsi_bot (adx rsi strategy)
 
-open futures order by ADX+RSI indicator
+open futures order by ADX+RSI[+STO] indicator
 
 ## v1.1.3
 - เพิ่ม STO (Stochastic Oscillator)
@@ -139,7 +139,7 @@ open futures order by ADX+RSI indicator
     exit_value_short = 50
 
     ;# STO on/off
-    sto_mode = 'off'
+    sto_mode = off
     sto_enter_long = 20
     sto_enter_short = 80
 
@@ -188,6 +188,11 @@ open futures order by ADX+RSI indicator
     ;# 0 = ปิดการใช้งาน
     loss_limit = 0
 
-## donate
+# download
+
+## v1.1.3
+- https://mega.nz/file/Pc4wFThI#cgwS7vmO9FcNOSjVJhhKUbGDvR6zB95FAJSIvgNmENI
+
+# donate
 - ETH: 0xeAfe7f1Db46E2c007b60174EB4527ab38bd54B54
 - DOGE: DCkpCgt1HUVhCsvJVW7YA4E4NkxMsLHPz8
