@@ -83,7 +83,7 @@ sto_d_period = 3
 ;exit_value_short = 50
 
 ;# STO on/off
-sto_mode = 'off'
+sto_mode = off
 sto_enter_long = 20
 sto_enter_short = 80
 

@@ -23,7 +23,10 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'ADX+RSI Futures (Binance) version 1.1.3'
+if config.isSTOOn:
+    bot_name = 'ADX+RSI+STO Futures (Binance) version 1.1.3'
+else:
+    bot_name = 'ADX+RSI Futures (Binance) version 1.1.3'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
