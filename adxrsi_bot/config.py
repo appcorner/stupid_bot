@@ -74,11 +74,14 @@ config.readfp(config_file)
 #------------------------------------------------------------
 API_KEY = get_str('binance','api_key')
 API_SECRET = get_str('binance','api_secret')
+SANDBOX = (get_str('binance','sandbox', 'off') == 'on')
 
 #------------------------------------------------------------
 # line
 #------------------------------------------------------------
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
+RemovePlot = (get_str('line','remove_plot', 'off') == 'on')
+SummaryReport = (get_str('line','summary_report', 'off') == 'on')
 
 #------------------------------------------------------------
 # app_config
@@ -90,6 +93,11 @@ LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
 UB_TIMER_MODE = get_int('app_config', 'UB_TIMER_MODE', 4)
 if UB_TIMER_MODE < 0 or UB_TIMER_MODE > 5:
     UB_TIMER_MODE = 4
+SWING_TF = get_int('app_config', 'SWING_TF', 5)
+SWING_TEST = get_int('app_config', 'SWING_TEST', 2)
+TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
+CB_AUTO_MODE = get_int('app_config', 'CB_AUTO_MODE', 1)
+START_TRADE_TF = get_str('app_config', 'START_TRADE_TF', '4h')
 
 #------------------------------------------------------------
 # setting
@@ -113,27 +121,24 @@ Leverage = get_int('setting', 'leverage', 20)
 CostType = get_str('setting', 'cost_type', '$')
 CostAmount = get_float('setting', 'cost_amount', 1.5)
 
-limit_Trade_Long = get_int('setting', 'limit_trade_long', 5)
-limit_Trade_Short = get_int('setting', 'limit_trade_short', 5)
-limit_Trade = get_int('setting', 'limit_trade', limit_Trade_Long+limit_Trade_Short)
-if (limit_Trade_Long + limit_Trade_Short) != limit_Trade:
-    limit_Trade_Long = round(limit_Trade / 2)
-    limit_Trade_Short = limit_Trade - limit_Trade_Long
+limit_Trade = get_int('setting', 'limit_trade', 10)
+if is_exist('setting', 'limit_trade') and limit_Trade != 0:
+    limit_Trade_Long = 0 # no limit
+    limit_Trade_Short = 0 # no limit
+else:
+    limit_Trade_Long = get_int('setting', 'limit_trade_long', 5)
+    limit_Trade_Short = get_int('setting', 'limit_trade_short', 5)
+    limit_Trade = 0 # no limit
 
 Not_Trade = get_float('setting', 'not_trade', 10.0)
 
 TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
-# TP = get_float('setting', 'tp_rate')
+
 TP_Long = get_float('setting', 'tp_long', 10.0)
 TP_Short = get_float('setting', 'tp_short', 10.0)
 
-TPclose = get_float('setting', 'tp_close', 50.0)
-TPclose_Long = TPclose
-TPclose_Short = TPclose
-if is_exist('setting', 'tp_close_long'):
-    TPclose_Long = get_float('setting', 'tp_close_long', 50.0)
-if is_exist('setting', 'tp_close_short'):
-    TPclose_Short = get_float('setting', 'tp_close_short', 50.0)
+TP_Close_Long = get_float('setting', 'tp_close_long', 50.0)
+TP_Close_Short = get_float('setting', 'tp_close_short', 50.0)
 
 # SL = get_float('setting', 'sl_rate')
 SL_Long = get_float('setting', 'sl_long', 4.0)
@@ -141,21 +146,23 @@ SL_Short = get_float('setting', 'sl_short', 4.0)
 
 Trailing_Stop_Mode = get_str('setting', 'trailing_stop_mode', 'on')
 
-Callback = get_float('setting', 'callback', 5.0)
-Callback_Long = Callback
-Callback_Short = Callback
-if is_exist('setting', 'callback_long'):
-    Callback_Long = get_float('setting', 'callback_long', 5.0)
-if is_exist('setting', 'callback_short'):
-    Callback_Short = get_float('setting', 'callback_short', 5.0)
+Callback_Long = get_float('setting', 'callback_long', 5.0)
+if Callback_Long > 5.0:
+    print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
+    Callback_Long = 5.0
+elif Callback_Long < 0.1:
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_Long = 0.0
+Callback_Short = get_float('setting', 'callback_short', 5.0)
+if Callback_Short > 5.0:
+    print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
+    Callback_Short = 5.0
+elif Callback_Short < 0.1:
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_Short = 0.0
 
-Active_TL = get_float('setting', 'active_tl_rate', 10.0)
-Active_TL_Long = Active_TL
-Active_TL_Short = Active_TL
-if is_exist('setting', 'active_tl_long'):
-    Active_TL_Long = get_float('setting', 'active_tl_long', 10.0)
-if is_exist('setting', 'active_tl_short'):
-    Active_TL_Short = get_float('setting', 'active_tl_short', 10.0)
+Active_TL_Long = get_float('setting', 'active_tl_long', 10.0)
+Active_TL_Short = get_float('setting', 'active_tl_short', 10.0)
 
 ADXPeriod = get_int('setting', 'adx_period', 14)
 ADXIn = get_int('setting', 'adx_in', 25)
@@ -170,23 +177,61 @@ ExitValueLong = get_int('setting', 'exit_value_long', 50)
 ExitShort = get_str('setting', 'exit_short', 'up')
 ExitValueShort = get_int('setting', 'exit_value_short', 50)
 
-MACD_FAST = get_int('setting', 'macd_fast', 12)
-MACD_SLOW = get_int('setting', 'macd_slow', 26)
-MACD_SIGNAL = get_int('setting', 'macd_signal', 9)
+# MACD_FAST = get_int('setting', 'macd_fast', 12)
+# MACD_SLOW = get_int('setting', 'macd_slow', 26)
+# MACD_SIGNAL = get_int('setting', 'macd_signal', 9)
 RSI_PERIOD = get_int('setting', 'rsi_period', 14)
 
+isSTOOn = get_str('setting', 'sto_mode', 'on') == 'on'
+STO_K_PERIOD = get_int('setting', 'sto_k_period', 14)
+STO_SMOOTH_K = get_int('setting', 'sto_smooth_k', 3)
+STO_D_PERIOD = get_int('setting', 'sto_d_period', 3)
+
+STOEnterLong = get_int('setting', 'sto_enter_long', 20)
+STOEnterShort = get_int('setting', 'sto_enter_short', 80)
+
+#------------------------------------------------------------
+# symbols_setting
+#------------------------------------------------------------
 CSV_NAME = get_str('symbols_setting', 'csv_name', None)
 
-TP_IfPNL_Gt = get_float('mm', 'tp_if_pnl_gt', 0.0)
-SL_IfPNL_Lt = get_float('mm', 'sl_if_pnl_lt', 0.0)
+#------------------------------------------------------------
+# mm
+#------------------------------------------------------------
+TP_PNL_Long = get_float('mm', 'tp_pnl_long', 0.0)
+SL_PNL_Long = get_float('mm', 'sl_pnl_long', 0.0)
 
-TP_IfAllProfit_Gt = get_float('mm', 'tp_if_all_profit_gt', 0.0)
-SL_IfAllProfit_Lt = get_float('mm', 'sl_if_all_profit_lt', 0.0)
+TP_PNL_Short = get_float('mm', 'tp_pnl_short', 0.0)
+SL_PNL_Short = get_float('mm', 'sl_pnl_short', 0.0)
 
-TP_IfLongProfit_Gt = get_float('mm', 'tp_if_long_profit_gt', 0.0)
-SL_IfLongProfit_Lt = get_float('mm', 'sl_if_long_profit_lt', 0.0)
+TP_PNL_Close_Long = get_float('mm', 'tp_pnl_close_rate_long', 50.0)
+TP_PNL_Close_Short = get_float('mm', 'tp_pnl_close_rate_short', 50.0)
 
-TP_IfShortProfit_Gt = get_float('mm', 'tp_if_short_profit_gt', 0.0)
-SL_IfShortProfit_Lt = get_float('mm', 'sl_if_short_profit_lt', 0.0)
+Callback_PNL_Long = get_float('mm', 'callback_pnl_long', 5.0)
+if Callback_PNL_Long > 5.0:
+    print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
+    Callback_PNL_Long = 5.0
+elif Callback_PNL_Long < 0.1:
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_PNL_Long = 0.0
+Callback_PNL_Short = get_float('mm', 'callback_pnl_short', 5.0)
+if Callback_PNL_Short > 5.0:
+    print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
+    Callback_PNL_Short = 5.0
+elif Callback_PNL_Short < 0.1:
+    print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
+    Callback_PNL_Short = 0.0
+
+Active_TL_PNL_Long = get_float('mm', 'active_tl_pnl_long', 0.0)
+Active_TL_PNL_Short = get_float('mm', 'active_tl_pnl_short', 0.0)
+
+TP_Profit = get_float('mm', 'tp_profit', 0.0)
+SL_Profit = get_float('mm', 'sl_profit', 0.0)
+TP_Profit_Long = get_float('mm', 'tp_profit_long', 0.0)
+SL_Profit_Long = get_float('mm', 'sl_profit_long', 0.0)
+TP_Profit_Short = get_float('mm', 'tp_profit_short', 0.0)
+SL_Profit_Short = get_float('mm', 'sl_profit_short', 0.0)
+
+Clear_Magin = get_float('mm', 'clear_margin', 0.01)
 
 Loss_Limit = get_int('mm', 'loss_limit', 0)
