@@ -1389,6 +1389,8 @@ async def mm_strategy():
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('mm_strategy')
+        notify.Send_Text(f'แจ้งปัญหาระบบ mm\nข้อผิดพลาด: {ex}')
+        pass
 
     finally:
         await exchange.close()
@@ -1457,6 +1459,8 @@ async def update_all_balance(notifyLine=False):
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_balance')
+        notify.Send_Text(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {ex}')
+        pass
 
     finally:
         await exchange.close()

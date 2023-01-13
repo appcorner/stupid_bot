@@ -1,0 +1,242 @@
+{
+    "DASHUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 2,
+        "check_candle": True
+    },
+    "APEUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "OGNUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "LRCUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "CRVUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "ZENUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "ICPUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "DEFIUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "1000LUNCUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "LTCUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "HBARUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 1,
+        "check_candle": True
+    },
+    "VETUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "MTLUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 2,
+        "check_candle": True
+    },
+    "RENUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "XLMUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "DOGEUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "TRBUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "HOTUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 1,
+        "check_candle": True
+    },
+    "ENSUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 1,
+        "check_candle": True
+    },
+    "API3USDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "NEARUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "1000XECUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "WOOUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "IOTAUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "STORJUSDT": {
+        "position": "close",
+        "win": 1,
+        "loss": 0,
+        "check_candle": True
+    },
+    "DARUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "CELOUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "ZILUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "RLCUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "CELRUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "QTUMUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "CTSIUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "STGUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "DOTUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "CHZUSDT": {
+        "position": "close",
+        "win": 0,
+        "loss": 1,
+        "check_candle": True
+    },
+    "CHRUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "AXSUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "ICXUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "DYDXUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    },
+    "1INCHUSDT": {
+        "position": "open",
+        "win": 0,
+        "loss": 0,
+        "check_candle": True
+    }
+}
