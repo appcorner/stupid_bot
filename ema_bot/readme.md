@@ -4,6 +4,11 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.11
+- กำหนดรูปแบบการคำนวน mm PNL แบบ % (percent_mode = on)
+- ปรับแก้ การแยกหรือรวม Margin Type ใหม่
+- ปรับปรุง code เพิ่มเติม
+
 ## v1.4.10
 - คำนวน amount, price แยกตาม precision ของแต่ล่ะเหรียญ
 - กำหนด Margin Type แยกหรือรวมกันได้
@@ -187,7 +192,11 @@ open futures order by cross signal between fast and slow indicator
     ;# ค่าตัวแปรต่างๆ กำหนดค่าเป็น 0 หรือ comment ถ้าต้องการปิดการทำงาน
 
     ;# ตั้ง TP/SL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด
-    ;# ใส่ค่าเป็น amount, เฉพาะ close_rate ใส่เป็น %
+    ;# ใส่ค่าเป็น amount หรือ % ตาม percent_mode, เฉพาะ close_rate ใส่เป็น %
+    ;# callback rate ranges from 0.1% to 5%, 0.0 for auto
+
+    percent_mode = on
+
     ;# ใช้กับ long position
     tp_pnl_long = 0.30
     tp_pnl_close_rate_long = 25.0
@@ -220,8 +229,10 @@ open futures order by cross signal between fast and slow indicator
 
 # download
 
-## v1.4.10
-- https://mega.nz/file/OFAkHQDY#wohtIGmoCMRBENcZhQNfY4iY_0Z_rRt4SUjNjjg-CLk
+## v1.4.11 (testing)
+-
+
+## v1.4.10 (bug)
 
 ## v1.4.9
 - https://mega.nz/file/iFoRWCRC#_owOvvQPFemR1TZpb5yrH7jBB08ZFb3wXpdmkJzsAQ0

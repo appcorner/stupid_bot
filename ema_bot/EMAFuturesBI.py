@@ -11,9 +11,8 @@ import os
 import pathlib
 import logging
 from logging.handlers import RotatingFileHandler
-from random import randint
+from random import randint, shuffle
 from datetime import datetime
-# from decimal import Decimal
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -24,7 +23,7 @@ import ccxt.async_support as ccxt
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-bot_name = 'EMA Futures (Binance) version 1.4.10'
+bot_name = 'EMA Futures (Binance) version 1.4.11'
 
 # ansi escape code
 CLS_SCREEN = '\033[2J\033[1;1H' # cls + set top left
@@ -67,8 +66,9 @@ UB_TIMER_SECONDS = [
     int(TIMEFRAME_SECONDS[config.timeframe]/2)
 ]
 
-POSITION_COLUMNS = ["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin"]
-# POSITION_COLUMNS = ["symbol", "entryPrice", "unrealizedProfit", "isolatedWallet", "positionAmt", "positionSide", "initialMargin"]
+POSITION_COLUMNS = ["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin", "leverage"]
+POSITION_COLUMNS_RENAME = ["index", "Symbol", "Entry Price", "Unrealized PNL", "Amount", "Margin", "Leverage", "Side", "Quote"]
+POSITION_COLUMNS_DISPLAY = ["Symbol", "Entry Price", "Unrealized PNL", "Amount", "Margin", "Leverage", "Side"]
 
 CSV_COLUMNS = [
         "symbol", "signal_index", "margin_type",
@@ -89,6 +89,8 @@ CSV_COLUMNS = [
         "slow_value"
         ]
 
+DATE_SUFFIX = datetime.now().strftime("%Y%m%d_%H%M%S")
+
 # ----------------------------------------------------------------------------
 # global variable
 # ----------------------------------------------------------------------------
@@ -100,12 +102,11 @@ count_trade_long = 0
 count_trade_short = 0
 
 start_balance_total = 0.0
-balance_entry = 0.0
 balalce_total = 0.0
+balance_entry = {}
 
 watch_list = []
 all_symbols = {}
-all_leverage = {}
 all_candles = {}
 
 orders_history = {}
@@ -128,12 +129,12 @@ def getExchange():
     return exchange
 
 def amount_to_precision(symbol, amount_value):
-    precision_amount = all_symbols[symbol]['precision']['amount']
-    amount = round(amount_value, precision_amount)
+    amount_precision = all_symbols[symbol]['amount_precision']
+    amount = round(amount_value, amount_precision)
     return amount
 def price_to_precision(symbol, price_value):
-    precision_price = all_symbols[symbol]['precision']['price']
-    price = round(price_value, precision_price)
+    price_precision = all_symbols[symbol]['price_precision']
+    price = round(price_value, price_precision)
     return price
 
 def detect_sideway_trend(df, atr_multiple=1.5, n=15, mode='2'):
@@ -581,6 +582,9 @@ def add_indicator(symbol, bars):
 
     return df
 
+def exchange_symbol(symbol):
+    return ':'.join([all_symbols[symbol]['symbol'],all_symbols[symbol]['quote']])
+
 """
 fetch_ohlcv - อ่านแท่งเทียน
 exchange: binance exchange
@@ -610,6 +614,7 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(2.5+(timestamp-last_candle_time)/timeframe_secs))
 
 async def set_leverage(exchange, symbol):
+    global all_symbols
     try:
         if config.automaxLeverage == "on":
             symbol_ccxt = all_symbols[symbol]['symbol']
@@ -624,8 +629,8 @@ async def set_leverage(exchange, symbol):
                 leverage = int(symbols_setting.loc[symbol]['leverage'])
             await exchange.set_leverage(leverage, symbol)
 
-        # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
-        all_leverage[symbol] = leverage
+        # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
+        all_symbols[symbol]['leverage'] = leverage
     except Exception as ex:
         logger.debug(f'{symbol} {type(ex).__name__} {str(ex)}')
         leverage = 5
@@ -634,8 +639,8 @@ async def set_leverage(exchange, symbol):
         print(symbol, f'found leverage error, Bot will set leverage = {leverage}')
         logger.info(f'{symbol} found leverage error, Bot will set leverage = {leverage}')
 
-        # เก็บค่า leverage ไว้ใน all_leverage เพื่อเอาไปใช้ต่อที่อื่น
-        all_leverage[symbol] = leverage
+        # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
+        all_symbols[symbol]['leverage'] = leverage
         try:
             await exchange.set_leverage(leverage, symbol)
         except Exception as ex:
@@ -701,73 +706,75 @@ def save_orders_history():
         'trade':orders_history[symbol]['trade']
     } for symbol in orders_history.keys()]
     oh_df = pd.DataFrame(oh_json)
-    oh_df.to_csv('orders_history.csv', index=False)
+    oh_df.to_csv('./datas/orders_history.csv', index=False)
 
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
     order = await exchange.create_market_buy_order(symbol, amount)
     await add_order_history(symbol)
     # print("Status : LONG ENTERING PROCESSING...")
-    logger.debug(order)
+    logger.debug(f'{symbol} long_enter {str(order)}')
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def long_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_sell_order(symbol, positionAmt, params={"reduceOnly":True})
     await close_order_history(symbol)
-    logger.debug(order)
+    logger.debug(f'{symbol} long_close {str(order)}')
     return
 #-------------------------------------------------------------------------------
 async def short_enter(exchange, symbol, amount):
     order = await exchange.create_market_sell_order(symbol, amount)
     await add_order_history(symbol)
     # print("Status : SHORT ENTERING PROCESSING...")
-    logger.debug(order)
+    logger.debug(f'{symbol} short_enter {str(order)}')
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def short_close(exchange, symbol, positionAmt):
     order = await exchange.create_market_buy_order(symbol, (positionAmt*-1), params={"reduceOnly":True})
     await close_order_history(symbol)
-    logger.debug(order)
+    logger.debug(f'{symbol} short_close {str(order)}')
     return
 #-------------------------------------------------------------------------------
 async def cancel_order(exchange, symbol):
     await sleep(1)
     order = await exchange.cancel_all_orders(symbol, params={'conditionalOrdersOnly':False})
-    logger.debug(order)
+    logger.debug(f'{symbol} cancel_order {str(order)}')
     return
 #-------------------------------------------------------------------------------
 async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
     closetp=(closeRate/100.0)
-    logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeamt:{amount*closetp}')
+    closeamt= amount_to_precision(symbol, amount*closetp)
+    logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeamt:{closeamt}')
     params = {
         'reduceOnly': True
     }
     params['stopPrice'] = pricetp
-    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'sell', (amount*closetp), PriceEntry, params)
-    logger.debug(order)
+    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'sell', closeamt, PriceEntry, params)
+    logger.debug(f'{symbol} long_TPSL-TP {str(order)}')
     await sleep(1)
     params['stopPrice'] = pricesl
     order = await exchange.create_order(symbol, 'STOP_MARKET', 'sell', amount, PriceEntry, params)
-    logger.debug(order)
+    logger.debug(f'{symbol} long_TPSL-SL {str(order)}')
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
 async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
     closetp=(closeRate/100.0)
-    logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeamt:{amount*closetp}')
+    closeamt= amount_to_precision(symbol, amount*closetp)
+    logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeamt:{closeamt}')
     params = {
         'quantityIsRequired': False, 
         'reduceOnly': True
     }
     params['stopPrice'] = pricetp
-    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'buy', (amount*closetp), PriceEntry, params)
-    logger.debug(order)
+    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'buy', closeamt, PriceEntry, params)
+    logger.debug(f'{symbol} short_TPSL-SL {str(order)}')
     await sleep(1)
     params['stopPrice'] = pricesl
     order = await exchange.create_order(symbol, 'STOP_MARKET', 'buy', amount, PriceEntry, params)        
-    logger.debug(order)           
+    logger.debug(f'{symbol} short_TPSL-SL {str(order)}')           
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
@@ -788,7 +795,7 @@ async def long_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
         params['activationPrice'] = priceTL
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate:{callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
-    logger.debug(order)
+    logger.debug(f'{symbol} long_TLSTOP {str(order)}')
     activatePrice = float(order['info']['activatePrice'])
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, activatePrice:{activatePrice}, callbackRate:{callbackRate}')
     await sleep(1)
@@ -805,7 +812,7 @@ async def short_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
 
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
     order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
-    logger.debug(order)
+    logger.debug(f'{symbol} short_TLSTOP {str(order)}')
     activatePrice = float(order['info']['activatePrice'])
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, activatePrice:{activatePrice}, callbackRate:{callbackRate}')
     await sleep(1)
@@ -840,8 +847,8 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
 
     return (float(priceEntry), float(amount))
 
-def crossover(seriesA, seriesB):
-    return (seriesA[0] < seriesB[0] and seriesA[1] > seriesB[1])
+def crossover(tupleA, tupleB):
+    return (tupleA[0] < tupleB[0] and tupleA[1] > tupleB[1])
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade, count_trade_long, count_trade_short
@@ -863,22 +870,20 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
     else:
         print(f'not found candles for {symbol}')
         return
-    # อ่านข้อมูล leverage ที่เก็บไว้ใน all_leverage
-    if symbol in all_leverage.keys():
-        leverage = all_leverage[symbol]
+    # อ่านข้อมูล leverage ที่เก็บไว้ใน all_symbols
+    if symbol in all_symbols.keys():
+        leverage = all_symbols[symbol]['leverage']
     else:
         print(f'not found leverage for {symbol}')
         return
 
-    # limitTrade = config.limit_Trade
+    marginType = all_symbols[symbol]['quote']
 
     hasLongPosition = False
     hasShortPosition = False
     positionAmt = 0.0
     
     positionInfo = all_positions.loc[all_positions['symbol']==symbol]
-
-    #market_info = pd.DataFrame(await exchange.fapiPrivate_get_positionrisk(), columns=["symbol", "entryPrice", "leverage" ,"unrealizedProfit", "isolatedWallet", "positionAmt"])
 
     if not positionInfo.empty and float(positionInfo.iloc[-1]["positionAmt"]) != 0:
         positionAmt = float(positionInfo.iloc[-1]["positionAmt"])
@@ -910,11 +915,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
         mid = (df.iloc[signalIdx-1]['mid'], df.iloc[signalIdx]['mid'])
         slow = (df.iloc[signalIdx-1]['slow'], df.iloc[signalIdx]['slow'])
         
-        isLongEnter = (fast[0] < slow[0] and fast[1] > slow[1])
-        isLongExit = (fast[0] > mid[0] and fast[1] < mid[1])
+        isLongEnter = crossover(fast, slow) # (fast[0] < slow[0] and fast[1] > slow[1])
+        isLongExit = crossover(mid, fast) # (fast[0] > mid[0] and fast[1] < mid[1])
 
-        isShortEnter = (fast[0] > slow[0] and fast[1] < slow[1])
-        isShortExit = (fast[0] < mid[0] and fast[1] > mid[1])
+        isShortEnter = crossover(slow, fast) # (fast[0] > slow[0] and fast[1] < slow[1])
+        isShortExit = crossover(fast, mid) # (fast[0] < mid[0] and fast[1] > mid[1])
 
         if config.isConfirmMACD:
             isLongEnter = isLongEnter and (df.iloc[signalIdx][config.ConfirmMACDBy] > 0)
@@ -968,14 +973,14 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
             print(f'{symbol:12} LONG')
             fibo_data = cal_minmax_fibo(symbol, df, 'LONG', closePrice)
-            if tradeMode == 'on' and balance_entry > config.Not_Trade \
+            if tradeMode == 'on' and balance_entry[marginType] > config.Not_Trade \
                 and (config.limit_Trade > count_trade or config.limit_Trade_Long > count_trade_long) :
                 count_trade_long = count_trade_long + 1
                 count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
-                balance_entry = balance_entry - (amount * priceEntry / leverage)
-                print('balance_entry', balance_entry)
+                balance_entry[marginType] = balance_entry[marginType] - (amount * priceEntry / leverage)
+                print('balance_entry', balance_entry[marginType])
                 await long_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
@@ -989,12 +994,22 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     notify_msg.append(f'# TPSL')
                     if config.TP_PNL_Long > 0:
                         closeRate = config.TP_PNL_Close_Long
-                        pricetp = price_to_precision(symbol, priceEntry + (config.TP_PNL_Long / amount))
-                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}'
+                        if config.is_percent_mode:
+                            pricetp = price_to_precision(symbol, priceEntry + (costAmount * (config.TP_PNL_Long / 100.0) / amount))
+                            fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}% @{pricetp}'
+                            notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f}% @{pricetp}')
+                        else:
+                            pricetp = price_to_precision(symbol, priceEntry + (config.TP_PNL_Long / amount))
+                            fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}'
+                            notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}')
                         fibo_data['tp'] = pricetp
-                        notify_msg.append(f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}')
+                        if config.CB_AUTO_MODE == 1:
+                            fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
                         if config.Active_TL_PNL_Long > 0:
-                            priceTL = price_to_precision(symbol, priceEntry + (config.Active_TL_PNL_Long / amount))
+                            if config.is_percent_mode:
+                                priceTL = price_to_precision(symbol, priceEntry + (costAmount * (config.Active_TL_PNL_Long / 100.0) / amount))
+                            else:
+                                priceTL = price_to_precision(symbol, priceEntry + (config.Active_TL_PNL_Long / amount))
                         callbackLong = config.Callback_PNL_Long
                     else:
                         closeRate = TPCloseLong
@@ -1011,10 +1026,17 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             priceTL = price_to_precision(symbol, priceEntry + (priceEntry * (activeTLLong / 100.0)))
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Long > 0:
-                        pricesl = price_to_precision(symbol, priceEntry - (config.SL_PNL_Long / amount))
-                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}'
+                        if config.is_percent_mode:
+                            pricesl = price_to_precision(symbol, priceEntry - (costAmount * (config.SL_PNL_Long / 100.0) / amount))
+                            fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl}'
+                            notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl}')
+                        else:
+                            pricesl = price_to_precision(symbol, priceEntry - (config.SL_PNL_Long / amount))
+                            fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}'
+                            notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}')
                         fibo_data['sl'] = pricesl
-                        notify_msg.append(f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}')
+                        if config.CB_AUTO_MODE != 1:
+                            fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
                     elif SLLong > 0:
                         pricesl = price_to_precision(symbol, priceEntry - (priceEntry * (SLLong / 100.0)))
                         fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl}'
@@ -1049,7 +1071,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     if priceTL == 0.0:
                         notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
                     elif config.TP_PNL_Long > 0:
-                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f} @{activatePrice}')
+                        if config.is_percent_mode:
+                            notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}% @{activatePrice}')
+                        else:
+                            notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f} @{activatePrice}')
                     elif activeTLLong > 0:
                         notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice}')
 
@@ -1075,14 +1100,14 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
             print(f'{symbol:12} SHORT')
             fibo_data = cal_minmax_fibo(symbol, df, 'SHORT', closePrice)
-            if tradeMode == 'on' and balance_entry > config.Not_Trade \
+            if tradeMode == 'on' and balance_entry[marginType] > config.Not_Trade \
                 and (config.limit_Trade > count_trade or config.limit_Trade_Short > count_trade_short) :
                 count_trade_short = count_trade_short + 1
                 count_trade = count_trade_long + count_trade_short
                 (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
                 # ปรับปรุงค่า balance_entry
-                balance_entry = balance_entry - (amount * priceEntry / leverage)
-                print('balance_entry', balance_entry)
+                balance_entry[marginType] = balance_entry[marginType] - (amount * priceEntry / leverage)
+                print('balance_entry', balance_entry[marginType])
                 await short_enter(exchange, symbol, amount)
                 print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                 await cancel_order(exchange, symbol)
@@ -1096,12 +1121,22 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     notify_msg.append(f'# TPSL')
                     if config.TP_PNL_Short > 0:
                         closeRate = config.TP_PNL_Close_Short
-                        pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
-                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}'
+                        if config.is_percent_mode:
+                            pricetp = price_to_precision(symbol, priceEntry - (costAmount * (config.TP_PNL_Short / 100.0) / amount))
+                            fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}% @{pricetp}'
+                            notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f}% @{pricetp}')
+                        else:
+                            pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
+                            fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}'
+                            notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}')          
                         fibo_data['tp'] = pricetp
-                        notify_msg.append(f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}')
+                        if config.CB_AUTO_MODE == 1:
+                            fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
                         if config.Active_TL_PNL_Short > 0:
-                            priceTL = price_to_precision(symbol, priceEntry - (config.Active_TL_PNL_Short / amount))
+                            if config.is_percent_mode:
+                                priceTL = price_to_precision(symbol, priceEntry - (costAmount * (config.Active_TL_PNL_Short / 100.0) / amount))
+                            else:
+                                priceTL = price_to_precision(symbol, priceEntry - (config.Active_TL_PNL_Short / amount))
                         callbackShort = config.Callback_PNL_Short
                     else:
                         closeRate = TPCloseShort
@@ -1118,9 +1153,15 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             priceTL = price_to_precision(symbol, priceEntry - (priceEntry * (activeTLShort / 100.0)))
                     notify_msg.append(f'TP close: {closeRate:.2f}%')
                     if config.SL_PNL_Short > 0:
-                        pricesl = price_to_precision(symbol, priceEntry + (config.SL_PNL_Short / amount))
-                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl}'
+                        if config.is_percent_mode:
+                            pricesl = price_to_precision(symbol, priceEntry + (costAmount * (config.SL_PNL_Short / 100.0) / amount))
+                            fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl}'
+                        else:
+                            pricesl = price_to_precision(symbol, priceEntry + (config.SL_PNL_Short / amount))
+                            fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl}'
                         fibo_data['sl'] = pricesl
+                        if config.CB_AUTO_MODE != 1:
+                            fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
                         notify_msg.append(f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl}')
                     elif SLShort > 0:
                         pricesl = price_to_precision(symbol, priceEntry + (priceEntry * (SLShort / 100.0)))
@@ -1156,7 +1197,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     if priceTL == 0.0:
                         notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
                     elif config.TP_PNL_Short > 0:
-                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f} @{activatePrice}')
+                        if config.is_percent_mode:
+                            notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}% @{activatePrice}')
+                        else:
+                            notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f} @{activatePrice}')
                     elif activeTLShort > 0:
                         notify_msg.append(f'Active Price: {activeTLShort:.2f}% @{activatePrice}')
 
@@ -1181,13 +1225,19 @@ async def load_all_symbols():
         # t1=time.time()
         markets = await exchange.fetch_markets()
         # print(markets[0])
-        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits','precision'])
+        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits','precision','info'])
         mdf.drop(mdf[~mdf.quote.isin(config.MarginType)].index, inplace=True)
         mdf.drop(mdf[mdf['id'].str.contains('_')].index, inplace=True)
         # print(mdf.head())
         # all_symbols = {r['id']:{'symbol':r['symbol'],'minAmount':r['minAmount']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minAmount']].to_dict('records')}
         # all_symbols = {r['id']:{'symbol':r['symbol'],'minCost':r['minCost']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minCost']].to_dict('records')}
-        all_symbols = {r['id']:{'symbol':r['symbol'],'quote':r['quote'],'precision':r['precision']} for r in mdf[['id','symbol','quote','precision']].to_dict('records')}
+        all_symbols = {r['id']:{
+            'symbol':r['symbol'],
+            'quote':r['quote'],
+            'leverage':config.Leverage,
+            'amount_precision':int(r['precision']['amount']),
+            'price_precision':int(r['info']['pricePrecision']),
+            } for r in mdf[['id','symbol','quote','precision','info']].to_dict('records')}
         # print(all_symbols, len(all_symbols))
         # print(all_symbols.keys())
         if len(config.watch_list) > 0:
@@ -1220,11 +1270,6 @@ async def set_all_leverage():
         # set leverage
         loops = [set_leverage(exchange, symbol) for symbol in watch_list]
         await gather(*loops)
-        # แสดงค่า leverage
-        # print(all_leverage)
-        print(f'leverage  : {len(all_leverage.keys())} symbols')
-
-        logger.info(f'leverage:{len(all_leverage.keys())}')
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -1264,6 +1309,7 @@ async def fetch_next_ohlcv(next_ticker):
         limit = 0
 
         # อ่านแท่งเทียนแบบ async และ เทรดตามสัญญาน
+        watch_list_rand = shuffle(watch_list.copy())
         loops = [fetch_ohlcv_trade(exchange, symbol, config.timeframe, limit, next_ticker) for symbol in watch_list]
         await gather(*loops)
 
@@ -1466,7 +1512,7 @@ async def mm_strategy():
     finally:
         await exchange.close()
 
-async def update_all_balance(checkMM=True, notifyLine=False):
+async def update_all_balance(notifyLine=False):
     global all_positions, balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, orders_history
     try:
         exchange = getExchange()
@@ -1474,48 +1520,51 @@ async def update_all_balance(checkMM=True, notifyLine=False):
         balance = await exchange.fetch_balance()
         # print(balance)
         ex_positions = balance['info']['positions']
-        balance_entry = 0.0
-        for marginType in config.MarginType:
-            balance_entry += float(balance[marginType]['free'])
         positions = [position for position in ex_positions 
             if position['symbol'] in all_symbols.keys() and
                 all_symbols[position['symbol']]['quote'] in config.MarginType and 
                 float(position['positionAmt']) != 0]
 
-        # sumLongProfit = sum([float(position['unrealizedProfit']) for position in positions if float(position['positionAmt']) >= 0])
-        # sumShortProfit = sum([float(position['unrealizedProfit']) for position in positions if float(position['positionAmt']) < 0])
-        # sumProfit = sumLongProfit + sumShortProfit
-        # sumLongMargin = sum([float(position['initialMargin']) for position in positions if float(position['positionAmt']) >= 0])
-        # sumShortMargin = sum([float(position['initialMargin']) for position in positions if float(position['positionAmt']) < 0])
-        # sumProfit = sum([float(position['unrealizedProfit']) for position in positions])
-        # sumMargin = sum([float(position['initialMargin']) for position in positions])
-
         all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
-        all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
-        count_trade = len(all_positions)
-        count_trade_long = sum(all_positions["pd."].map(lambda x : x == 'LONG'))
-        count_trade_short = sum(all_positions["pd."].map(lambda x : x == 'SHORT'))
-
+        all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
+        all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
-        sumProfit = all_positions['unrealizedProfit'].astype('float64').sum()
-        sumMargin = all_positions['initialMargin'].astype('float64').sum()
-        balalce_total = balance_entry + sumMargin + sumProfit
-        balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
 
-        # print("all_positions ================")
-        print(all_positions)
+        count_trade = len(all_positions)
+        count_trade_long = sum(all_positions["positionSide"].map(lambda x : x == 'LONG'))
+        count_trade_short = sum(all_positions["positionSide"].map(lambda x : x == 'SHORT'))
+        
+        balance_entry = { marginType:0.0 for marginType in config.MarginType}
+        balalce_total = 0.0
+
         ub_msg = []
         ub_msg.append('รายงานสรุป')
+        for marginType in config.MarginType:
+            balance_entry[marginType] = float(balance[marginType]['free'])
+
+            matgin_positions = all_positions[all_positions['quote'] == marginType]
+            matgin_positions.reset_index(inplace=True)
+            matgin_positions.index = matgin_positions.index + 1
+            sumProfit = matgin_positions['unrealizedProfit'].astype('float64').sum()
+            sumMargin = matgin_positions['initialMargin'].astype('float64').sum()
+            balalce_total += (balance_entry[marginType] + sumMargin + sumProfit)
+
+            matgin_positions.columns = POSITION_COLUMNS_RENAME
+            if len(matgin_positions) > 0:
+                print(matgin_positions[POSITION_COLUMNS_DISPLAY])
+            ub_msg.append(f"# {marginType} Balance\nCurrent: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.4f}\nProfit: {sumProfit:+,.4f}")
+            print(f"{marginType}\nBalance Entry === {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.2f} Profit: {sumProfit:+,.4f}")
+        
         if config.limit_Trade > 0:
             ub_msg.append(f"# Count Trade\nLong+Short: {count_trade}/{config.limit_Trade}")
             print(f"Count Trade ===== {count_trade}/{config.limit_Trade}")
         else:
             ub_msg.append(f"# Count Trade\nLong: {count_trade_long}/{config.limit_Trade_Long}\nShort: {count_trade_short}/{config.limit_Trade_Short}")
             print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
-        ub_msg.append(f"# Balance\nCurrent: {balance_entry:,.4f}\nMargin: {sumMargin:+,.4f}\nProfit: {sumProfit:+,.4f}")
-        ub_msg.append(f"Total: {balalce_total:,.4f}\nChange: {balance_change:+,.4f}")
-        print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.2f} Profit: {sumProfit:+,.4f}")
+        
+        balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
+        ub_msg.append(f"# Total {balalce_total:,.4f}\n# Change {balance_change:+,.4f}")
         print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
 
         if notifyLine:
@@ -1685,6 +1734,7 @@ async def main():
         print(type(ex).__name__, str(ex))
         logger.exception('main')
 
+
 async def waiting():
     count = 0
     status = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
@@ -1698,6 +1748,7 @@ if __name__ == "__main__":
     try:
         pathlib.Path('./plots').mkdir(parents=True, exist_ok=True)
         pathlib.Path('./logs').mkdir(parents=True, exist_ok=True)
+        pathlib.Path('./datas').mkdir(parents=True, exist_ok=True)
 
         logger = logging.getLogger("App Log")
         logger.setLevel(config.LOG_LEVEL)
@@ -1723,3 +1774,5 @@ if __name__ == "__main__":
 
     finally:
         print(SHOW_CURSOR, end="")
+        # save data
+        os.rename('./datas/orders_history.csv', f'./datas/orders_history_{DATE_SUFFIX}.csv')

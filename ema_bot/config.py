@@ -192,14 +192,16 @@ CSV_NAME = get_str('symbols_setting', 'csv_name', None)
 #------------------------------------------------------------
 # mm
 #------------------------------------------------------------
+is_percent_mode = get_str('mm', 'percent_mode', 'on') == 'on'
+
 TP_PNL_Long = get_float('mm', 'tp_pnl_long', 0.0)
 SL_PNL_Long = get_float('mm', 'sl_pnl_long', 0.0)
 
 TP_PNL_Short = get_float('mm', 'tp_pnl_short', 0.0)
 SL_PNL_Short = get_float('mm', 'sl_pnl_short', 0.0)
 
-TP_PNL_Close_Long = get_float('mm', 'tp_pnl_close_rate_long', 0.0)
-TP_PNL_Close_Short = get_float('mm', 'tp_pnl_close_rate_short', 0.0)
+TP_PNL_Close_Long = get_float('mm', 'tp_pnl_close_rate_long', 50.0)
+TP_PNL_Close_Short = get_float('mm', 'tp_pnl_close_rate_short', 50.0)
 
 Callback_PNL_Long = get_float('mm', 'callback_pnl_long', 0.0)
 if Callback_PNL_Long > 5.0:
