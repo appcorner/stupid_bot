@@ -135,26 +135,26 @@ Not_Trade = get_float('setting', 'not_trade', 10.0)
 
 TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
 
-TP_Long = get_float('setting', 'tp_long', 10.0)
-TP_Short = get_float('setting', 'tp_short', 10.0)
+TP_Long = get_float('setting', 'tp_long', 0.0)
+TP_Short = get_float('setting', 'tp_short', 0.0)
 
 TP_Close_Long = get_float('setting', 'tp_close_long', 50.0)
 TP_Close_Short = get_float('setting', 'tp_close_short', 50.0)
 
 # SL = get_float('setting', 'sl_rate')
-SL_Long = get_float('setting', 'sl_long', 4.0)
-SL_Short = get_float('setting', 'sl_short', 4.0)
+SL_Long = get_float('setting', 'sl_long', 0.0)
+SL_Short = get_float('setting', 'sl_short', 0.0)
 
 Trailing_Stop_Mode = get_str('setting', 'trailing_stop_mode', 'on')
 
-Callback_Long = get_float('setting', 'callback_long', 5.0)
+Callback_Long = get_float('setting', 'callback_long', 0.0)
 if Callback_Long > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_Long = 5.0
 elif Callback_Long < 0.1:
     print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
     Callback_Long = 0.0
-Callback_Short = get_float('setting', 'callback_short', 5.0)
+Callback_Short = get_float('setting', 'callback_short', 0.0)
 if Callback_Short > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_Short = 5.0
@@ -162,8 +162,8 @@ elif Callback_Short < 0.1:
     print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
     Callback_Short = 0.0
 
-Active_TL_Long = get_float('setting', 'active_tl_long', 10.0)
-Active_TL_Short = get_float('setting', 'active_tl_short', 10.0)
+Active_TL_Long = get_float('setting', 'active_tl_long', 0.0)
+Active_TL_Short = get_float('setting', 'active_tl_short', 0.0)
 
 Fast_Type = get_str('setting', 'fast_type')
 Fast_Value = get_int('setting', 'fast_value')
@@ -198,17 +198,17 @@ SL_PNL_Long = get_float('mm', 'sl_pnl_long', 0.0)
 TP_PNL_Short = get_float('mm', 'tp_pnl_short', 0.0)
 SL_PNL_Short = get_float('mm', 'sl_pnl_short', 0.0)
 
-TP_PNL_Close_Long = get_float('mm', 'tp_pnl_close_rate_long', 50.0)
-TP_PNL_Close_Short = get_float('mm', 'tp_pnl_close_rate_short', 50.0)
+TP_PNL_Close_Long = get_float('mm', 'tp_pnl_close_rate_long', 0.0)
+TP_PNL_Close_Short = get_float('mm', 'tp_pnl_close_rate_short', 0.0)
 
-Callback_PNL_Long = get_float('mm', 'callback_pnl_long', 5.0)
+Callback_PNL_Long = get_float('mm', 'callback_pnl_long', 0.0)
 if Callback_PNL_Long > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_PNL_Long = 5.0
 elif Callback_PNL_Long < 0.1:
     print(f'callback rate ranges from 0.1% to 5%, set to 0.0')
     Callback_PNL_Long = 0.0
-Callback_PNL_Short = get_float('mm', 'callback_pnl_short', 5.0)
+Callback_PNL_Short = get_float('mm', 'callback_pnl_short', 0.0)
 if Callback_PNL_Short > 5.0:
     print(f'callback rate ranges from 0.1% to 5%, set to 5.0%')
     Callback_PNL_Short = 5.0
@@ -218,6 +218,8 @@ elif Callback_PNL_Short < 0.1:
 
 Active_TL_PNL_Long = get_float('mm', 'active_tl_pnl_long', 0.0)
 Active_TL_PNL_Short = get_float('mm', 'active_tl_pnl_short', 0.0)
+
+average_level = get_int('mm', 'average_level', 0)
 
 TP_Profit = get_float('mm', 'tp_profit', 0.0)
 SL_Profit = get_float('mm', 'sl_profit', 0.0)

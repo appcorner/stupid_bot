@@ -839,7 +839,10 @@ async def cal_amount(exchange, symbol, leverage, costType, costAmount, closePric
     logger.info(f'{symbol} lev:{leverage} close:{closePrice} last:{priceEntry} amt:{amount}')
 
     return (float(priceEntry), float(amount))
-        
+
+def crossover(seriesA, seriesB):
+    return (seriesA[0] < seriesB[0] and seriesA[1] > seriesB[1])
+
 async def go_trade(exchange, symbol, chkLastPrice=True):
     global all_positions, balance_entry, count_trade, count_trade_long, count_trade_short
 
@@ -1294,8 +1297,14 @@ async def mm_strategy():
         logger.debug(f'Short: {config.TP_Profit_Short}, {config.SL_Profit_Short}')
         # logger.debug(f'PNL: {config.TP_PNL}, {config.SL_PNL}')
 
-        if (config.TP_Profit > 0 and sumProfit > config.TP_Profit) or \
-            (config.SL_Profit > 0 and sumProfit < -config.SL_Profit):
+        tp_profit = config.TP_Profit
+        sl_profit = config.SL_Profit
+        if config.average_level > len(mm_positions):
+            tp_profit = config.TP_Profit/config.limit_Trade*len(mm_positions)
+            sl_profit = config.SL_Profit/config.limit_Trade*len(mm_positions)
+
+        if (config.TP_Profit > 0 and sumProfit > tp_profit) or \
+            (config.SL_Profit > 0 and sumProfit < -sl_profit):
 
             exit_loops = []
             cancel_loops = []
@@ -1451,6 +1460,8 @@ async def mm_strategy():
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('mm_strategy')
+        notify.Send_Text(f'แจ้งปัญหาระบบ mm\nข้อผิดพลาด: {str(ex)}')
+        pass
 
     finally:
         await exchange.close()
@@ -1476,8 +1487,8 @@ async def update_all_balance(checkMM=True, notifyLine=False):
         # sumProfit = sumLongProfit + sumShortProfit
         # sumLongMargin = sum([float(position['initialMargin']) for position in positions if float(position['positionAmt']) >= 0])
         # sumShortMargin = sum([float(position['initialMargin']) for position in positions if float(position['positionAmt']) < 0])
-        sumProfit = sum([float(position['unrealizedProfit']) for position in positions])
-        sumMargin = sum([float(position['initialMargin']) for position in positions])
+        # sumProfit = sum([float(position['unrealizedProfit']) for position in positions])
+        # sumMargin = sum([float(position['initialMargin']) for position in positions])
 
         all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
         all_positions["pd."] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
@@ -1485,8 +1496,10 @@ async def update_all_balance(checkMM=True, notifyLine=False):
         count_trade_long = sum(all_positions["pd."].map(lambda x : x == 'LONG'))
         count_trade_short = sum(all_positions["pd."].map(lambda x : x == 'SHORT'))
 
-        all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.2f}'.format(float(x)))
+        all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
+        sumProfit = all_positions['unrealizedProfit'].astype('float64').sum()
+        sumMargin = all_positions['initialMargin'].astype('float64').sum()
         balalce_total = balance_entry + sumMargin + sumProfit
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
 
@@ -1502,7 +1515,7 @@ async def update_all_balance(checkMM=True, notifyLine=False):
             print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
         ub_msg.append(f"# Balance\nCurrent: {balance_entry:,.4f}\nMargin: {sumMargin:+,.4f}\nProfit: {sumProfit:+,.4f}")
         ub_msg.append(f"Total: {balalce_total:,.4f}\nChange: {balance_change:+,.4f}")
-        print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.4f} Profit: {sumProfit:+,.4f}")
+        print(f"Balance Entry === {balance_entry:,.4f} Margin: {sumMargin:+,.2f} Profit: {sumProfit:+,.4f}")
         print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
 
         if notifyLine:
@@ -1523,7 +1536,7 @@ async def update_all_balance(checkMM=True, notifyLine=False):
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_balance')
-        notify.Send_Text(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {ex}')
+        notify.Send_Text(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {str(ex)}')
         pass
 
     finally:
