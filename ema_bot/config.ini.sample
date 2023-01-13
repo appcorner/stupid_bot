@@ -120,7 +120,10 @@ rolling_period = 15
 ;# ค่าตัวแปรต่างๆ กำหนดค่าเป็น 0 หรือ comment ถ้าต้องการปิดการทำงาน
 
 ;# ตั้ง TP/SL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด
-;# ใส่ค่าเป็น amount, เฉพาะ close_rate ใส่เป็น %
+;# ใส่ค่าเป็น amount หรือ % ตาม percent_mode, เฉพาะ close_rate ใส่เป็น %
+;# callback rate ranges from 0.1% to 5%, 0.0 for auto
+
+percent_mode = on
 
 ;# ใช้กับ long position
 tp_pnl_long = 0.30
