@@ -66,10 +66,9 @@ UB_TIMER_SECONDS = [
     int(TIMEFRAME_SECONDS[config.timeframe]/2)
 ]
 
-POSITION_COLUMNS = ["symbol", "entryPrice", "unrealizedProfit", "positionAmt", "initialMargin", "leverage"]
-POSITION_COLUMNS_RENAME = ["index", "Symbol", "Entry Price", "Unrealized PNL", "Amount", "Margin", "Leverage", "Side", "Quote"]
-POSITION_COLUMNS_DISPLAY = ["Symbol", "Entry Price", "Unrealized PNL", "Amount", "Margin", "Leverage", "Side"]
-
+POSITION_COLUMNS = ["symbol", "entryPrice", "positionAmt", "initialMargin", "leverage", "unrealizedProfit"]
+POSITION_COLUMNS_RENAME = ["Symbol", "Entry Price", "Amount", "Margin", "Leverage", "Unrealized PNL", "Side", "Quote"]
+POSITION_COLUMNS_DISPLAY = ["Symbol", "Side", "Entry Price", "Amount", "Margin", "Leverage", "Unrealized PNL"]
 CSV_COLUMNS = [
         "symbol", "signal_index", "margin_type",
         "trade_mode", "trade_long", "trade_short",
@@ -1535,37 +1534,39 @@ async def update_all_balance(notifyLine=False):
         count_trade_long = sum(all_positions["positionSide"].map(lambda x : x == 'LONG'))
         count_trade_short = sum(all_positions["positionSide"].map(lambda x : x == 'SHORT'))
         
+        ub_msg = []
+        ub_msg.append('รายงานสรุป')
+
+        if config.limit_Trade > 0:
+            ub_msg.append(f"# Count Trade\nLong+Short: {count_trade}/{config.limit_Trade}")
+            print(f"Count Trade : {count_trade}/{config.limit_Trade}")
+        else:
+            ub_msg.append(f"# Count Trade\nLong: {count_trade_long}/{config.limit_Trade_Long}\nShort: {count_trade_short}/{config.limit_Trade_Short}")
+            print(f"Count Trade : Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
+
         balance_entry = { marginType:0.0 for marginType in config.MarginType}
         balalce_total = 0.0
 
-        ub_msg = []
-        ub_msg.append('รายงานสรุป')
         for marginType in config.MarginType:
             balance_entry[marginType] = float(balance[marginType]['free'])
 
-            matgin_positions = all_positions[all_positions['quote'] == marginType]
-            matgin_positions.reset_index(inplace=True)
-            matgin_positions.index = matgin_positions.index + 1
-            sumProfit = matgin_positions['unrealizedProfit'].astype('float64').sum()
-            sumMargin = matgin_positions['initialMargin'].astype('float64').sum()
-            balalce_total += (balance_entry[marginType] + sumMargin + sumProfit)
+            margin_positions = all_positions[all_positions['quote'] == marginType]
+            margin_positions.reset_index(drop=True, inplace=True)
+            margin_positions.index = margin_positions.index + 1
+            sumProfit = margin_positions['unrealizedProfit'].astype('float64').sum()
+            sumMargin = margin_positions['initialMargin'].astype('float64').sum()
+            total = (balance_entry[marginType] + sumMargin + sumProfit)
+            balalce_total += total
 
-            matgin_positions.columns = POSITION_COLUMNS_RENAME
-            if len(matgin_positions) > 0:
-                print(matgin_positions[POSITION_COLUMNS_DISPLAY])
-            ub_msg.append(f"# {marginType} Balance\nCurrent: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.4f}\nProfit: {sumProfit:+,.4f}")
-            print(f"{marginType}\nBalance Entry === {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.2f} Profit: {sumProfit:+,.4f}")
-        
-        if config.limit_Trade > 0:
-            ub_msg.append(f"# Count Trade\nLong+Short: {count_trade}/{config.limit_Trade}")
-            print(f"Count Trade ===== {count_trade}/{config.limit_Trade}")
-        else:
-            ub_msg.append(f"# Count Trade\nLong: {count_trade_long}/{config.limit_Trade_Long}\nShort: {count_trade_short}/{config.limit_Trade_Short}")
-            print(f"Count Trade ===== Long: {count_trade_long}/{config.limit_Trade_Long} Short: {count_trade_short}/{config.limit_Trade_Short}")
+            margin_positions.columns = POSITION_COLUMNS_RENAME
+            if len(margin_positions) > 0:
+                print(margin_positions[POSITION_COLUMNS_DISPLAY])
+            ub_msg.append(f"# {marginType}\nBalance: {total:,.4f}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.2f}\nProfit: {sumProfit:+,.4f}")
+            print(f"Balance === {total:,.4f} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.2f} Profit: {sumProfit:+,.4f}")
         
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
         ub_msg.append(f"# Total {balalce_total:,.4f}\n# Change {balance_change:+,.4f}")
-        print(f"Total Balance === {balalce_total:,.4f} Change: {balance_change:+,.4f}")
+        print(f"Total ===== {balalce_total:,.4f} Change: {balance_change:+,.4f}")
 
         if notifyLine:
             notify.Send_Text('\n'.join(ub_msg))
