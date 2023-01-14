@@ -5,9 +5,11 @@
 open futures order by cross signal between fast and slow indicator
 
 ## v1.4.11
-- กำหนดรูปแบบการคำนวน mm PNL แบบ % (percent_mode = on)
+- กำหนดรูปแบบการคำนวน MM PNL แบบ % (percent_mode = on)
+- แยก loop ในการทำ MM ให้ทำงานไวขึ้น เพราะการปิด position ที่ราคาตลาด ทำให้เกิดผลต่างจากเวลา
 - ปรับแก้ การแยกหรือรวม Margin Type ใหม่
-- ปรับปรุง code เพิ่มเติม
+- ปรับปรุง code เพิ่มเติม, แก้ปัญหาเรื่องทศนิยม
+- ปรับปรุงการบันทีก log
 
 ## v1.4.10
 - คำนวน amount, price แยกตาม precision ของแต่ล่ะเหรียญ
@@ -86,36 +88,52 @@ open futures order by cross signal between fast and slow indicator
 
     [app_config]
     ;TIME_SHIFT = 5
+
+    ;# จำนวนแท่งเทียนที่ต้องการให้บอทใช้ทำงาน
     ;CANDLE_LIMIT = 1000
+
+    ;# จำนวนแท่งเทียนที่ต้องการแสดงกราฟ
     ;CANDLE_PLOT = 100
+
     ;# level การบันทึก log file ทั่วไปให้ใช้แบบ INFO
     ;# CRITICAL 50, ERROR 40, WARNING 30, INFO 20, DEBUG 10, NOTSET 0
     LOG_LEVEL = 10
+
     ;# กำหนดรอบเวลาในแสดง update balancec และ mm check
     ;# 0=timeframe, 1=15, 2=20, 3=30, 4=60, 5=timeframe/2 
     UB_TIMER_MODE = 3
+
+    ;# กำหนดเาลาเป็น นาที ถ้าเป็น 0 จะใช้ UB_TIMER_MODE
+    MM_TIMER_MIN = 0.5
+
     ;# จำนวน TF ในการตรวจหา swing low/high
     ;SWING_TF = 5
+
     ;# จำนวนค่า swing low/high ที่ใช้ในการคิด SL
     ;SWING_TEST = 2
+
     ;# level ของ fibo ที่ใช้ในการคิด TP
     ;TP_FIBO = 2
+
     ;# คำนวน callback rate จาก 1 = TP, 2 = SL
     ;CB_AUTO_MODE = 1
 
     [setting]
     ;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d
-    timeframe = 1m
+    timeframe = 4h
+
     ;# กำหนดสัญญานที่แท่ง -1 หรือ -2 เท่านั้น, default = -2
     signal_index = -2
+
     ;# กำหนด Margin Type แยกหรือรวมกันได้
     ;# ต.ย. margin_type = USDT,BUSD
     margin_type = USDT
 
     ;# ระบุ symbol ที่ต้องการใน watch_list, back_list
-    ;watch_list = BTCUSDT,DOGEUSDT,GALUSDT,GALAUSDT,IOSTUSDT,MANAUSDT,NEARUSDT,OCEANUSDT,XLMUSDT,XRPUSDT
-    ;back_list = FTTUSDT
+    ;watch_list = BTCUSDT,BTCBUSD
+    ;back_list = FTTUSDT,FTTBUSD
 
+    ;# กำหนด on/off ในการเทรด
     trade_mode = on
     trade_long = on
     trade_short = on
@@ -128,6 +146,7 @@ open futures order by cross signal between fast and slow indicator
 
     ;# กำหนดจำนวน positions ทั้ง long, short รวมกันจะไม่เกิน limit_trade
     limit_trade = 10
+
     ;# ถ้ากำหนด limit_trade = 0 จะไปใช้ค่า limit_trade_long และ limit_trade_short แทน
     ;# กำหนดจำนวน positions แยกตาม long, short จะไม่เกิน limit_trade_long และ limit_trade_short
     limit_trade_long = 5
@@ -136,7 +155,9 @@ open futures order by cross signal between fast and slow indicator
     ;# กำหนดจำนวน balance ขั้นต่ำ จะไม่เปิด position ใหม่ ถ้า balance เหลือต่ำกว่า not_trade
     not_trade = 10.0
 
+    ;# กำหนด on/off สำหรับ order TP LS
     tpsl_mode = on
+    ;# กำหนดค่า TP/SL เป็น % จะคำนวนค่าจากราคาเหรียญ
     ;# ต้องให้คำนวน TP/SL auto ให้กำหนดค่า tp_long, tp_short, sl_long, sl_short เป็น 0.0 
     tp_long = 10.0
     tp_short = 10.0
@@ -147,12 +168,15 @@ open futures order by cross signal between fast and slow indicator
 
     ;# กำหนด on/off สำหรับ trailing stop
     trailing_stop_mode = on
-    ;# ค่า callback rate จะต้องอยู่ระหว่าง 0.1 ถึง 5.0
+
+    ;# ค่า callback rate จะต้องอยู่ระหว่าง 0.1 ถึง 5.0, 0.0 for auto
     callback_long = 5.0
     callback_short = 5.0
-    ;# ค่า active tl มีปัญหา ให้กำหนดเป็น 0.0 เพื่อให้ API กำหนด auto จะเป็นราคาใกล้ๆราคาตลาด
-    active_tl_long = 0.0
-    active_tl_short = 0.0
+
+    ;# ค่า active tl กำหนดเป็น % ถ้ากำหนดเป็น 0.0 เพื่อให้บอทคำนวนค่าให้
+    ;# *** ถ้าพบปัญหาให้ตั้งค่าเป็น 0.0 ***
+    active_tl_long = 10.0
+    active_tl_short = 10.0
 
     ;# กำหนดค่า fast, mid, slow เพื่อให้บอทใช้หาสัญญานในการเปิด position
     ;# ระบุ type fast,slow => EMA, SMA, HMA, RMA, WMA, VWMA
@@ -191,37 +215,47 @@ open futures order by cross signal between fast and slow indicator
     ;# ต้องให้คำนวน TP/SL auto ให้กำหนดค่า tp_pnl_long, tp_pnl_short, sl_pnl_long, sl_pnl_short เป็น 0.0 
     ;# ค่าตัวแปรต่างๆ กำหนดค่าเป็น 0 หรือ comment ถ้าต้องการปิดการทำงาน
 
-    ;# ตั้ง TP/SL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด
-    ;# ใส่ค่าเป็น amount หรือ % ตาม percent_mode, เฉพาะ close_rate ใส่เป็น %
+    ;# TP/SL แบบ PNL เพื่อปิด position โดยใช้ค่า PNL amount มาเป็นตัวกำหนด
+
+    ;# ใส่ค่าเป็น amount (percent_mode=off) หรือ % (percent_mode=on) จะคำนวน amount ให้จาก % x cost_amount
+    ;# ค่า close_rate ใส่เป็น % เท่านั้น
     ;# callback rate ranges from 0.1% to 5%, 0.0 for auto
 
     percent_mode = on
 
-    ;# ใช้กับ long position
+    ;# ส่วนนี้ใช้กับ long position
     tp_pnl_long = 0.30
     tp_pnl_close_rate_long = 25.0
     sl_pnl_long = 0.10
-    ;# ค่า active tl มีปัญหา ให้กำหนดเป็น 0.0 เพื่อให้ API กำหนด auto จะเป็นราคาใกล้ๆราคาตลาด
+    ;# ค่า active tl ถ้ากำหนดเป็น 0.0 เพื่อให้บอทคำนวนค่าให้
     active_tl_pnl_long = 0.0
     callback_pnl_long = 5.0
-    ;# ใช้กับ short position
+
+    ;# ส่วนนี้ใช้กับ short position
     tp_pnl_short = 0.30
     tp_pnl_close_rate_short = 25.0
     sl_pnl_short = 0.10
-    ;# ค่า active tl มีปัญหา ให้กำหนดเป็น 0.0 เพื่อให้ API กำหนด auto จะเป็นราคาใกล้ๆราคาตลาด
+    ;# ค่า active tl ถ้ากำหนดเป็น 0.0 เพื่อให้บอทคำนวนค่าให้
     active_tl_pnl_short = 0.0
     callback_pnl_short = 5.0
 
-    ;# TP/SL เพื่อปิด positions ทั้งหมด โดยใช้ค่าผลรวมของ profit มาเป็นตัวกำหนด โดยบอทจะทำ TP/SL ตามรอบเวลาที่กำหนดไว้ (default 60 secs)
-    ;# ใช้กับทุก positions
+    ;# TP/SL Profit เพื่อปิด positions ทั้งหมด โดยใช้ค่าผลรวมของ profit มาเป็นตัวกำหนด 
+    ;# จะทำจะงานตามรอบเวลาที่กำหนดไว้ที่ MM_TIMER_MIN
+    
+    ;# ส่วนนี้สำหรับคำนวนรวมทุก positions
     ;tp_profit = 1.5
     ;sl_profit = 1.4
-    ;# ใช้กับ long position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
+
+    ;# ส่วนนี้สำหรับคำนวนแยก long position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
     tp_profit_long = 3.0
     sl_profit_long = 1.5
-    ;# ใช้กับ short position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
+
+    ;# ส่วนนี้สำหรับคำนวนแยก short position (ถ้ากำหนดแบบรวมไว้ ค่านี้จะไม่ถูกใช้)
     tp_profit_short = 3.0
     sl_profit_short = 1.5
+
+    ;# กำหนดค่าการปิด position ที่มี margin น้อยกว่า clear_margin, default คีอ 0.01
+    clear_margin = 0.01
 
     ;# ระบบจะนับ loss ถ้าเกิด loss เกิน loss_limit จะทำการเอาเหรียญออกจาก watch_list ชั่วคราว
     ;# เมื่อปิดเปิดบอทใหม่ watch_list จะเป็นค่าเดิมที่ตั้งไว้
@@ -229,8 +263,8 @@ open futures order by cross signal between fast and slow indicator
 
 # download
 
-## v1.4.11 (testing)
--
+## v1.4.11
+- https://mega.nz/file/yVJyzSSQ#Nh_cSqynoPmCPJIKzQXFBlmTxK0Cp1VDWCRGnNXC4ts
 
 ## v1.4.10 (bug)
 
