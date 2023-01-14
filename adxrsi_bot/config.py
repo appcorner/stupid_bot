@@ -93,6 +93,7 @@ LOG_LEVEL = get_int('app_config', 'LOG_LEVEL', 20)
 UB_TIMER_MODE = get_int('app_config', 'UB_TIMER_MODE', 4)
 if UB_TIMER_MODE < 0 or UB_TIMER_MODE > 5:
     UB_TIMER_MODE = 4
+MM_TIMER_MIN = get_float('app_config', 'MM_TIMER_MIN', 0.0)
 SWING_TF = get_int('app_config', 'SWING_TF', 5)
 SWING_TEST = get_int('app_config', 'SWING_TEST', 2)
 TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
@@ -108,7 +109,8 @@ SignalIndex = get_int('setting', 'signal_index', -2)
 if SignalIndex > -1 or SignalIndex < -2:
     SignalIndex = -2
 
-MarginType = get_str('setting', 'margin_type', 'USDT')
+# MarginType = get_str('setting', 'margin_type', 'USDT')
+MarginType = get_list('setting', 'margin_type', ['USDT'])
 
 watch_list = get_list('setting', 'watch_list')
 back_list = get_list('setting', 'back_list')
@@ -198,6 +200,8 @@ CSV_NAME = get_str('symbols_setting', 'csv_name', None)
 #------------------------------------------------------------
 # mm
 #------------------------------------------------------------
+is_percent_mode = get_str('mm', 'percent_mode', 'off') == 'on'
+
 TP_PNL_Long = get_float('mm', 'tp_pnl_long', 0.0)
 SL_PNL_Long = get_float('mm', 'sl_pnl_long', 0.0)
 
@@ -224,6 +228,8 @@ elif Callback_PNL_Short < 0.1:
 
 Active_TL_PNL_Long = get_float('mm', 'active_tl_pnl_long', 0.0)
 Active_TL_PNL_Short = get_float('mm', 'active_tl_pnl_short', 0.0)
+
+average_level = get_int('mm', 'average_level', 0)
 
 TP_Profit = get_float('mm', 'tp_profit', 0.0)
 SL_Profit = get_float('mm', 'sl_profit', 0.0)

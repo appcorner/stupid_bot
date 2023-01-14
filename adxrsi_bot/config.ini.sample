@@ -1,12 +1,14 @@
 [binance]
 api_key = <binance api key>
-api_secret = <binance app secret>
+api_secret = <binance api secret>
 ;# กำหนดเป็น on เมื่อต้องการทดสอบด้วย https://testnet.binancefuture.com
-;sandbox = off
+sandbox = off
 
 [line]
 notify_token = <line notify token>
+;# กำหนด on/off เพื่อ เปิด/ปิด การลบรูปกราฟหลังจากใช้งานเสร็จ
 remove_plot = on
+;# กำหนด on/off เพื่อ เปิด/ปิด การรายงานสรุป
 summary_report = on
 
 [app_config]
@@ -19,19 +21,22 @@ summary_report = on
 LOG_LEVEL = 20
 ;# กำหนดรอบเวลาในแสดง update balancec และ mm check
 ;# 0=timeframe, 1=15, 2=20, 3=30, 4=60, 5=timeframe/2 
-UB_TIMER_MODE = 3
+UB_TIMER_MODE = 4
+MM_TIMER_MIN = 0.5
 ;SWING_TF = 5
 ;SWING_TEST = 2
 ;TP_FIBO = 2
 ;CB_AUTO_MODE = 1
 
 [setting]
-timeframe = 15m
-signal_index = -1
+;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d
+timeframe = 4h
+signal_index = -2
 margin_type = USDT
 
-;watch_list = BTCUSDT,ETHUDST,DOGEUSDT
-;back_list = SRMUSDT,SOLUSDT,SFPUSDT,FTTUSDT,CVCUSDT,DARUSDT,BNXUSDT
+;# ระบุ symbol ที่ต้องการใน watch_list, back_list และต้องสอดคล้องกับ margin_type
+;watch_list = BTCUSDT,ETHUSDT
+;back_list = SRMUSDT,SOLUSDT,SFPUSDT,FTTUSDT,CVCUSDT,DARUSDT,BNXUSDT,WAVESUSDT,HNTUSDT,RENUSDT,DENTUSDT,GALAUSDT,FTTBUSD,ANCBUSD,GALABUSD,WAVESBUSD,LDOBUSD,AUCTIONBUSD,LEVERBUSD,AMBBUSD,PHBBUSD,LDOUSDT
 
 trade_mode = on
 trade_long = on
@@ -39,30 +44,28 @@ trade_short = on
 
 auto_max_leverage = off
 leverage = 20
-auto_min_cost = off
 cost_type = $
 cost_amount = 0.5
 
-limit_trade = 0
-limit_trade_long = 5
-limit_trade_short = 5
+limit_trade = 20
+limit_trade_long = 10
+limit_trade_short = 10
 
-not_trade = 5.0
+not_trade = 10.0
 
 tpsl_mode = on
-tp_long = 9.0
-tp_short = 9.0
-tp_close_long = 40.0
-tp_close_short = 40.0
-sl_long = 3.0
-sl_short = 3.0
+;tp_long = 12.0
+;tp_short = 12.0
+tp_close_long = 50.0
+tp_close_short = 50.0
+;sl_long = 4.0
+;sl_short = 4.0
 
 trailing_stop_mode = on
-;# callback rate ranges from 0.1% to 5%, 0.0 for auto
-callback_long = 1.5
-callback_short = 1.5
-active_tl_long = 9.0
-active_tl_short = 9.0
+;callback_long = 2.5
+;callback_short = 2.5
+;active_tl_long = 10.0
+;active_tl_short = 10.0
 
 ;# default period
 adx_period = 14
@@ -91,25 +94,27 @@ sto_enter_short = 80
 ;csv_name = symbol_config.csv
 
 [mm]
-; ใส่ค่าเป็น amount, เฉพาะ close_rate ใส่เป็น %
-tp_pnl_long = 0.0
-tp_pnl_close_rate_long = 25.0
-sl_pnl_long = 0.0
-active_tl_pnl_long = 0.0
-callback_pnl_long = 0.0
+;percent_mode = off
 
-tp_pnl_short = 0.0
-tp_pnl_close_rate_short = 25.0
-sl_pnl_short = 0.0
-active_tl_pnl_short = 0.0
-callback_pnl_short = 0.0
+;tp_pnl_long = 0.50
+;tp_pnl_close_rate_long = 25.0
+;sl_pnl_long = 0.25
+;active_tl_pnl_long = 0.50
+;callback_pnl_long = 2.5
 
-;tp_profit = 5.0
-;sl_profit = 3.0
-;tp_profit_long = 2.5
-;sl_profit_long = 1.5
-;tp_profit_short = 2.5
-;sl_profit_short = 1.5
+;tp_pnl_short = 0.50
+;tp_pnl_close_rate_short = 25.0
+;sl_pnl_short = 0.25
+;active_tl_pnl_short = 0.50
+;callback_pnl_short = 2.5
+
+;average_level = 5
+;tp_profit = 3.0
+;sl_profit = 1.0
+;tp_profit_long = 2.0
+;sl_profit_long = 1.0
+;tp_profit_short = 2.0
+;sl_profit_short = 1.0
 
 clear_margin = 0.01
 

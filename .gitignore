@@ -132,9 +132,11 @@ binance_bot/plots/
 ema_bot/config.ini
 ema_bot/plots/
 ema_bot/logs/
+ema_bot/datas/
 adxrsi_bot/config.ini
 adxrsi_bot/plots/
 adxrsi_bot/logs/
+adxrsi_bot/datas/
 *.ini
 *.log
 *.log.*
