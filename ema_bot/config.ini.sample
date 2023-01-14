@@ -1,6 +1,6 @@
 [binance]
 api_key = <binance api key>
-api_secret = <binance app secret>
+api_secret = <binance api secret>
 ;# กำหนดเป็น on เมื่อต้องการทดสอบด้วย https://testnet.binancefuture.com
 sandbox = off
 
