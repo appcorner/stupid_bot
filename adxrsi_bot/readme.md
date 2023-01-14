@@ -231,7 +231,7 @@ open futures order by ADX+RSI[+STO] indicator
 # download
 
 ## v1.1.4
-- https://mega.nz/file/bdJ1AZzI#xHpk6vKuqfjLUsGCMvjxsEU2FK8QA-6cr6OWAoH69ZY
+- https://mega.nz/file/7BpghRBQ#rk8YsEqTwwWdjbr4B8_TqdrpccdmGNVwzDLu3qFo7OA
 
 ## v1.1.3
 - https://mega.nz/file/Pc4wFThI#cgwS7vmO9FcNOSjVJhhKUbGDvR6zB95FAJSIvgNmENI

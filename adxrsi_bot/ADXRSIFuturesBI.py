@@ -955,7 +955,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                 fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}% @{pricetp}'
                             else:
                                 pricetp = price_to_precision(symbol, priceEntry + (config.TP_PNL_Long / amount))
-                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f} @{pricetp}'
+                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}$ @{pricetp}'
                             fibo_data['tp'] = pricetp
                             if config.CB_AUTO_MODE == 1:
                                 fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
@@ -984,7 +984,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                 fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl}'
                             else:
                                 pricesl = price_to_precision(symbol, priceEntry - (config.SL_PNL_Long / amount))
-                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f} @{pricesl}'
+                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}$ @{pricesl}'
                             fibo_data['sl'] = pricesl
                             if config.CB_AUTO_MODE != 1:
                                 fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
@@ -1024,7 +1024,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             if config.is_percent_mode:
                                 notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}% @{activatePrice}')
                             else:
-                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f} @{activatePrice}')
+                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}$ @{activatePrice}')
                         elif activeTLLong > 0:
                             notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice}')
 
@@ -1079,7 +1079,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                 fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}% @{pricetp}'
                             else:
                                 pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
-                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f} @{pricetp}'
+                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}$ @{pricetp}'
                             fibo_data['tp'] = pricetp
                             if config.CB_AUTO_MODE == 1:
                                 fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
@@ -1108,7 +1108,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                 fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl}'
                             else:
                                 pricesl = price_to_precision(symbol, priceEntry + (config.SL_PNL_Short / amount))
-                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f} @{pricesl}'
+                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}$ @{pricesl}'
                             fibo_data['sl'] = pricesl
                             if config.CB_AUTO_MODE != 1:
                                 fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
@@ -1148,7 +1148,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             if config.is_percent_mode:
                                 notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}% @{activatePrice}')
                             else:
-                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f} @{activatePrice}')
+                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}$ @{activatePrice}')
                         elif activeTLShort > 0:
                             notify_msg.append(f'Active Price: {activeTLShort:.2f}% @{activatePrice}')
 
@@ -1535,7 +1535,7 @@ async def update_all_balance(notifyLine=False):
             if len(margin_positions) > 0:
                 print(margin_positions[POSITION_COLUMNS_DISPLAY])
             ub_msg.append(f"# {marginType}\nBalance: {total:,.4f}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.2f}\nProfit: {sumProfit:+,.4f}")
-            print(f"Balance === {total:,.4f} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.2f} Profit: {sumProfit:+,.4f}")
+            print(f"Balance === {marginType} {total:,.4f} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.2f} Profit: {sumProfit:+,.4f}")
         
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
         ub_msg.append(f"# Total {balalce_total:,.4f}\n# Change {balance_change:+,.4f}")
