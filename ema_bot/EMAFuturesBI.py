@@ -1242,7 +1242,8 @@ async def load_all_symbols():
             'quote':r['quote'],
             'leverage':config.Leverage,
             'amount_precision':int(r['precision']['amount']),
-            'price_precision':int(r['info']['pricePrecision']),
+            # 'price_precision':int(r['info']['pricePrecision']),
+            'price_precision':int(r['precision']['price']),
             } for r in mdf[['id','symbol','quote','precision','info']].to_dict('records')}
         # print(all_symbols, len(all_symbols))
         # print(all_symbols.keys())
@@ -1401,16 +1402,16 @@ async def mm_strategy():
                 cancel_loops.append(cancel_order(exchange, symbol))
 
             try:
-                await gather(*cancel_loops)
-            except Exception as ex:
-                print(type(ex).__name__, str(ex))
-                logger.exception('mm_strategy cancel all')
-
-            try:
                 await gather(*exit_loops)
             except Exception as ex:
                 print(type(ex).__name__, str(ex))
                 logger.exception('mm_strategy exit all')
+
+            try:
+                await gather(*cancel_loops)
+            except Exception as ex:
+                print(type(ex).__name__, str(ex))
+                logger.exception('mm_strategy cancel all')
 
             if len(mm_notify) > 0:
                 txt_notify = '\n'.join(mm_notify)
@@ -1558,7 +1559,7 @@ async def update_all_balance(notifyLine=False):
         all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
         all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
-        all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.2f}'.format(float(x)))
+        all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.4f}'.format(float(x)))
 
         count_trade = len(all_positions)
         count_trade_long = sum(all_positions["positionSide"].map(lambda x : x == 'LONG'))
@@ -1579,21 +1580,29 @@ async def update_all_balance(notifyLine=False):
         balalce_total = 0.0
 
         for marginType in config.MarginType:
-            balance_entry[marginType] = float(balance[marginType]['free'])
-
             margin_positions = all_positions[all_positions['quote'] == marginType]
             margin_positions.reset_index(drop=True, inplace=True)
             margin_positions.index = margin_positions.index + 1
-            sumProfit = margin_positions['unrealizedProfit'].astype('float64').sum()
-            sumMargin = margin_positions['initialMargin'].astype('float64').sum()
-            total = (balance_entry[marginType] + sumMargin + sumProfit)
-            balalce_total += total
+            # sumProfit = margin_positions['unrealizedProfit'].astype('float64').sum()
+            # sumMargin = margin_positions['initialMargin'].astype('float64').sum()
+            # total = (balance_entry[marginType] + sumMargin + sumProfit)
+
+            marginAsset = [asset for asset in balance['info']['assets'] if asset['asset'] == marginType][0]
+            balance_entry[marginType] = float(marginAsset['availableBalance'])
+            sumProfit = float(marginAsset['unrealizedProfit'])
+            sumMargin = float(marginAsset['initialMargin'])
+            marginBalance = float(marginAsset['marginBalance'])
+            # walletBalance = float(marginAsset['walletBalance'])
+            # balance_cal = (balance_entry[marginType] + sumMargin + sumProfit)
+            balalce_total += marginBalance
 
             margin_positions.columns = POSITION_COLUMNS_RENAME
             if len(margin_positions) > 0:
                 print(margin_positions[POSITION_COLUMNS_DISPLAY])
-            ub_msg.append(f"# {marginType}\nBalance: {total:,.4f}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.2f}\nProfit: {sumProfit:+,.4f}")
-            print(f"Balance === {marginType} {total:,.4f} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.2f} Profit: {sumProfit:+,.4f}")
+            else:
+                print('No Positions')
+            ub_msg.append(f"# {marginBalance:,.4f} {marginType}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.4f}\nProfit: {sumProfit:+,.4f}")
+            print(f"Balance === {marginBalance:,.4f} {marginType} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.4f} Profit: {sumProfit:+,.4f}")
         
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
         ub_msg.append(f"# Total {balalce_total:,.4f}\n# Change {balance_change:+,.4f}")
@@ -1815,4 +1824,6 @@ if __name__ == "__main__":
     finally:
         print(SHOW_CURSOR, end="")
         # save data
-        os.rename('./datas/orders_history.csv', f'./datas/orders_history_{DATE_SUFFIX}.csv')
+        history_file_path = './datas/orders_history.csv'
+        if os.path.exists(history_file_path):
+            os.rename(history_file_path, f'./datas/orders_history_{DATE_SUFFIX}.csv')
