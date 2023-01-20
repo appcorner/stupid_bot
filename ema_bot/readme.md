@@ -6,7 +6,7 @@ open futures order by cross signal between fast and slow indicator
 
 ## v1.4.12
 - แสดง position เรียงตามกำไร
-- ปิด position จากกำไรน้อยไปมาก
+- mm profit จะปิด position จากกำไรน้อยไปมาก
 - แสดงค่า Risk
 - ตรวจสอบและแสดงรายการ order ที่เปิดไว้
 

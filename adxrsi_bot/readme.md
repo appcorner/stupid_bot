@@ -6,7 +6,7 @@ open futures order by ADX+RSI[+STO] indicator
 
 ## v1.1.5
 - แสดง position เรียงตามกำไร
-- ปิด position จากกำไรน้อยไปมาก
+- mm profit จะปิด position จากกำไรน้อยไปมาก
 - แสดงค่า Risk
 - ตรวจสอบและแสดงรายการ order ที่เปิดไว้
 
