@@ -4,6 +4,12 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## v1.4.12
+- แสดง position เรียงตามกำไร
+- ปิด position จากกำไรน้อยไปมาก
+- แสดงค่า Risk
+- ตรวจสอบและแสดงรายการ order ที่เปิดไว้
+
 ## v1.4.11
 - กำหนดรูปแบบการคำนวน MM PNL แบบ % (percent_mode = on)
 - แยก loop ในการทำ MM ให้ทำงานไวขึ้น เพราะการปิด position ที่ราคาตลาด ทำให้เกิดผลต่างจากเวลา
@@ -189,6 +195,8 @@ open futures order by cross signal between fast and slow indicator
 
     ;# กำหนด on/off สำหรับตรวจสอบ macd ก่อนเปิด position
     confirm_macd_mode = on
+    ;# MACD, MACDs, MACDh
+    ;confirm_macd_by = MACD
     ;# สำหรับคำนวน macd fast 12, slow 16, signal 9 คือค่ามาตราฐาน
     macd_fast = 12
     macd_slow = 26

@@ -24,7 +24,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 bot_name = 'EMA'
-bot_vesion = '1.4.11'
+bot_vesion = '1.4.12'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -57,8 +57,9 @@ TIMEFRAME_SECONDS = {
     '1d': 60*60*24,
 }
 
-CANDLE_LIMIT = config.CANDLE_LIMIT
 CANDLE_PLOT = config.CANDLE_PLOT
+CANDLE_SAVE = CANDLE_PLOT + max(config.Mid_Value,config.Slow_Value,config.MACD_SLOW,config.RSI_PERIOD,config.RollingPeriod)
+CANDLE_LIMIT = max(config.CANDLE_LIMIT,CANDLE_SAVE)
 
 UB_TIMER_SECONDS = [
     TIMEFRAME_SECONDS[config.timeframe],
@@ -70,8 +71,8 @@ UB_TIMER_SECONDS = [
 ]
 
 POSITION_COLUMNS = ["symbol", "entryPrice", "positionAmt", "initialMargin", "leverage", "unrealizedProfit"]
-POSITION_COLUMNS_RENAME = ["Symbol", "Entry Price", "Amount", "Margin", "Leverage", "Unrealized PNL", "Side", "Quote"]
-POSITION_COLUMNS_DISPLAY = ["Symbol", "Side", "Entry Price", "Amount", "Margin", "Leverage", "Unrealized PNL"]
+POSITION_COLUMNS_RENAME = ["Symbol", "Entry Price", "Amount", "Margin", "Leverage", "Unrealized PNL", "Side", "Quote", "Orders"]
+POSITION_COLUMNS_DISPLAY = ["Symbol", "Side", "Entry Price", "Amount", "Margin", "Leverage", "Unrealized PNL", "Orders"]
 
 CSV_COLUMNS = [
         "symbol", "signal_index", "margin_type",
@@ -374,18 +375,21 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
 
         showFibo = fibo_data != None and 'exit' not in pd.lower()
 
-        colors = ['green' if value >= 0 else 'red' for value in data['MACD']]
+        colors = ['green' if value >= 0 else 'red' for value in data['MACDh']]
         added_plots = [
             mpf.make_addplot(data['fast'],color='red',width=0.5),
             mpf.make_addplot(data['mid'],color='orange',width=0.5),
             mpf.make_addplot(data['slow'],color='green',width=0.5),
+            
             mpf.make_addplot(data['RSI'],ylim=(10, 90),panel=2,color='blue',width=0.75,
                 ylabel=f"RSI ({config.RSI_PERIOD})", y_on_right=False),
             mpf.make_addplot(RSI30,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
             mpf.make_addplot(RSI50,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
             mpf.make_addplot(RSI70,ylim=(10, 90),panel=2,color='red',linestyle='-.',width=0.5),
-            mpf.make_addplot(data['MACD'],type='bar',width=0.7,panel=3,color=colors,
-                ylabel=f"MACD", y_on_right=True),
+
+            mpf.make_addplot(data['MACDh'],type='bar',width=0.5,panel=3,color=colors,
+                ylabel=f"MACD ({config.MACD_FAST})", y_on_right=True),
+            mpf.make_addplot(data['MACD'],panel=3,color='orange',width=0.75),
             mpf.make_addplot(data['MACDs'],panel=3,color='blue',width=0.75),
         ]
 
@@ -661,18 +665,8 @@ async def set_leverage(exchange, symbol):
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
     await gather( go_trade(exchange, symbol) )
+
 # order management zone --------------------------------------------------------
-async def set_order_history(positions_list):
-    global orders_history
-    for symbol in positions_list:
-        orders_history[symbol] = {
-                'position': 'open', 
-                'win': 0, 
-                'loss': 0, 
-                'trade': 1,
-                'last_loss': 0
-                }
-    logger.debug(orders_history)
 async def add_order_history(symbol):
     global orders_history
     if symbol not in orders_history.keys():
@@ -717,7 +711,32 @@ def save_orders_history():
     } for symbol in orders_history.keys()]
     oh_df = pd.DataFrame(oh_json)
     oh_df.to_csv('./datas/orders_history.csv', index=False)
-
+async def update_open_orders(exchange, symbol):
+    global orders_history
+    await add_order_history(symbol)
+    open_orders = await exchange.fetch_open_orders(symbol)
+    logger.debug(f'{symbol} update_open_orders {open_orders}')
+    tp_txt = '..'
+    sl_txt = '..'
+    tl_txt = '..'
+    orders = []
+    for order in open_orders:
+        order = { 
+            'type': order['type'],
+            'stopPrice': order['stopPrice'],
+            'amount': order['amount'],
+            'remaining': order['remaining']
+        }
+        if order['type'] == 'trailing_stop_market':
+            tl_txt = 'TL'
+        elif order['type'] == 'stop_market':
+            sl_txt = 'SL'
+        elif order['type'] == 'take_profit_market':
+            tp_txt = 'TP'
+        orders.append(order)
+    orders_history[symbol]['orders'] = orders
+    orders_history[symbol]['orders_code'] = f'{tp_txt}{sl_txt}{tl_txt}'
+        
 # trading zone -----------------------------------------------------------------
 async def long_enter(exchange, symbol, amount):
     order = await exchange.create_market_buy_order(symbol, amount)
@@ -876,7 +895,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
     await sleep(delay)
 
     # อ่านข้อมูลแท่งเทียนที่เก็บไว้ใน all_candles
-    if symbol in all_candles.keys() and len(all_candles[symbol]) >= CANDLE_LIMIT:
+    if symbol in all_candles.keys() and len(all_candles[symbol]) >= CANDLE_SAVE:
         df = all_candles[symbol]
     else:
         print(f'not found candles for {symbol}')
@@ -1240,7 +1259,7 @@ async def load_all_symbols():
         all_symbols = {r['id']:{
             'symbol':r['symbol'],
             'quote':r['quote'],
-            'leverage':config.Leverage,
+            'leverage':1,
             'amount_precision':int(r['precision']['amount']),
             # 'price_precision':int(r['info']['pricePrecision']),
             'price_precision':int(r['precision']['price']),
@@ -1337,6 +1356,8 @@ async def mm_strategy():
             if position['symbol'] in all_symbols.keys() and
                 all_symbols[position['symbol']]['quote'] in config.MarginType and 
                 float(position['positionAmt']) != 0]
+
+        mm_positions = sorted(mm_positions, key=lambda k: float(k['unrealizedProfit']))
 
         # sumProfit = sum([float(position['unrealizedProfit']) for position in mm_positions])
         sumLongProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) >= 0])
@@ -1542,8 +1563,8 @@ async def mm_strategy():
     finally:
         await exchange.close()
 
-async def update_all_balance(notifyLine=False):
-    global all_positions, balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, orders_history
+async def update_all_positions():
+    global all_positions, orders_history
     try:
         exchange = getExchange()
 
@@ -1554,12 +1575,46 @@ async def update_all_balance(notifyLine=False):
             if position['symbol'] in all_symbols.keys() and
                 all_symbols[position['symbol']]['quote'] in config.MarginType and 
                 float(position['positionAmt']) != 0]
+        
+        positions = sorted(positions, key=lambda k: float(k['unrealizedProfit']), reverse=True)
 
         all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
         all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
         all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
         all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
         all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.4f}'.format(float(x)))
+
+        # update open order
+        loops = [update_open_orders(exchange, p['symbol']) for p in positions]
+        await gather(*loops)
+
+        all_positions['orders'] = all_positions['symbol'].apply(lambda x: orders_history[x]['orders_code'])
+        
+        # clear order if no positions
+        loops = [cancel_order(exchange, symbol) for symbol in orders_history.keys() if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list()]
+        await gather(*loops)
+
+        for symbol in orders_history.keys():
+            if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list():
+                orders_history[symbol]['position'] = 'close'
+
+        logger.debug(orders_history)
+        save_orders_history()
+
+    except Exception as ex:
+        print(type(ex).__name__, str(ex))
+        logger.exception('update_all_positions')
+        notify.Send_Text(f'แจ้งปัญหาระบบ update positions\nข้อผิดพลาด: {str(ex)}')
+
+    finally:
+        await exchange.close()
+
+    return balance
+
+async def update_all_balance(notifyLine=False):
+    global balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short
+    try:
+        balance = await update_all_positions()
 
         count_trade = len(all_positions)
         count_trade_long = sum(all_positions["positionSide"].map(lambda x : x == 'LONG'))
@@ -1595,6 +1650,8 @@ async def update_all_balance(notifyLine=False):
             # walletBalance = float(marginAsset['walletBalance'])
             # balance_cal = (balance_entry[marginType] + sumMargin + sumProfit)
             balalce_total += marginBalance
+            maintMargin = float(marginAsset['maintMargin'])
+            totalRisk = abs(maintMargin) / (balance_entry[marginType]+sumMargin) * 100
 
             margin_positions.columns = POSITION_COLUMNS_RENAME
             if len(margin_positions) > 0:
@@ -1603,6 +1660,7 @@ async def update_all_balance(notifyLine=False):
                 print('No Positions')
             ub_msg.append(f"# {marginBalance:,.4f} {marginType}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.4f}\nProfit: {sumProfit:+,.4f}")
             print(f"Balance === {marginBalance:,.4f} {marginType} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.4f} Profit: {sumProfit:+,.4f}")
+            print(f"Risk ====== {totalRisk:,.2f}%")
         
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
         ub_msg.append(f"# Total {balalce_total:,.4f}\n# Change {balance_change:+,.4f}")
@@ -1613,24 +1671,11 @@ async def update_all_balance(notifyLine=False):
             
         logger.info(f'countTrade:{count_trade} (L:{count_trade_long},S:{count_trade_short}) balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit}')
 
-        loops = [cancel_order(exchange, symbol) for symbol in orders_history.keys() if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list()]
-        await gather(*loops)
-
-        for symbol in orders_history.keys():
-            if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list():
-                orders_history[symbol]['position'] = 'close' 
-    
-        logger.debug(orders_history)
-        save_orders_history()
-
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_balance')
         notify.Send_Text(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {str(ex)}')
         pass
-
-    finally:
-        await exchange.close()
 
 async def load_symbols_setting():
     global symbols_setting
@@ -1708,6 +1753,8 @@ async def main():
     await update_all_balance(notifyLine=config.SummaryReport)
     start_balance_total = balalce_total
 
+    await close_non_position_order(watch_list, all_positions['symbol'].to_list())
+
     time_wait = TIMEFRAME_SECONDS[config.timeframe] # กำหนดเวลาต่อ 1 รอบ
     time_wait_ub = UB_TIMER_SECONDS[config.UB_TIMER_MODE] # กำหนดเวลา update balance
     if config.MM_TIMER_MIN == 0.0:
@@ -1725,9 +1772,6 @@ async def main():
     t2=(time.time())-t1
     print(f'total time : {t2:0.2f} secs')
     logger.info(f'first ohlcv: {t2:0.2f} secs')
-
-    await set_order_history(all_positions['symbol'].to_list())
-    await close_non_position_order(watch_list, all_positions['symbol'].to_list())
 
     try:
         start_ticker = time.time()
