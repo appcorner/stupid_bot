@@ -79,6 +79,8 @@ slow_value = 34
 ;# EMA 8,32,32 -> mao mao
 
 confirm_macd_mode = on
+;# MACD, MACDs, MACDh
+;confirm_macd_by = MACD
 macd_fast = 12
 macd_slow = 26
 macd_signal = 9
