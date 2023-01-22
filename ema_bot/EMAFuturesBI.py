@@ -1596,10 +1596,12 @@ async def mm_strategy():
             initialMargin = float(marginAsset['initialMargin'])
             maintMargin = float(marginAsset['maintMargin'])
             totalRisk = abs(maintMargin) / (availableBalance+initialMargin) * 100
-            if ~is_send_notify_risk and (config.risk_limit > 0) and (totalRisk > config.risk_limit):
+            if is_send_notify_risk == False and (config.risk_limit > 0) and (totalRisk > config.risk_limit):
                 is_send_notify_risk = True
                 logger.debug(f'MM Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
                 line_notify(f'แจ้งเตือน\nRisk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
+            elif totalRisk <= config.risk_limit:
+                is_send_notify_risk = False
 
         # clear margin
         exit_loops = []
@@ -1706,7 +1708,7 @@ async def update_all_positions():
     return balance
 
 async def update_all_balance(notifyLine=False):
-    global balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, total_risk, is_send_notify_risk
+    global balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, total_risk
     try:
         balance = await update_all_positions()
 
@@ -1758,7 +1760,6 @@ async def update_all_balance(notifyLine=False):
             risk_txt = ' (no limit)'
             if config.risk_limit > 0:
                 risk_txt = f' (limit {config.risk_limit:,.2f}%)'
-            is_send_notify_risk = True
             ub_msg.append(f"Risk: {totalRisk:,.2f}%{risk_txt}")
             print(f"Risk ====== {totalRisk:,.2f}%{risk_txt}")
         
@@ -1832,7 +1833,7 @@ async def close_non_position_order(watch_list, positions_list):
         await exchange.close()
 
 async def main():
-    global start_balance_total
+    global start_balance_total, is_send_notify_risk
 
     marginList = ','.join(config.MarginType)
     if config.SANDBOX:
@@ -1904,6 +1905,8 @@ async def main():
                 next_ticker += time_wait # กำหนดรอบเวลาถัดไป
                 next_ticker_ub += time_wait_ub
                 next_ticker_mm += time_wait_mm
+
+                is_send_notify_risk = False
 
                 await sleep(10)
 
