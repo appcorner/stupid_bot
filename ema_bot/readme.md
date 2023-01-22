@@ -8,7 +8,8 @@ open futures order by cross signal between fast and slow indicator
 - แสดง position เรียงตามกำไร
 - mm profit จะปิด position จากกำไรน้อยไปมาก
 - แสดงค่า Risk
-- ตรวจสอบและแสดงรายการ order ที่เปิดไว้
+- กำหนดค่า Risk ขั้นต่ำในการเปิด positions (risk_limit)
+- ตรวจสอบและแสดงรายการ order ที่เปิดไว้ และแก้บัคการลบ order
 
 ## v1.4.11
 - กำหนดรูปแบบการคำนวน MM PNL แบบ % (percent_mode = on)
@@ -160,6 +161,8 @@ open futures order by cross signal between fast and slow indicator
 
     ;# กำหนดจำนวน balance ขั้นต่ำ จะไม่เปิด position ใหม่ ถ้า balance เหลือต่ำกว่า not_trade
     not_trade = 10.0
+    ;# กำหนค่า % risk ที่ต้องการให้หยุดเปิด position เมื่อ risk มีค่าเกิน risk_limit, กำหนดเป็นค่า 0.0 คือ no limit
+    risk_limit = 50.0
 
     ;# กำหนด on/off สำหรับ order TP LS
     tpsl_mode = on

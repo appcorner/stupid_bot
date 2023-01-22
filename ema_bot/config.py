@@ -133,6 +133,7 @@ else:
     limit_Trade = 0 # no limit
 
 Not_Trade = get_float('setting', 'not_trade', 10.0)
+risk_limit = get_float('setting', 'risk_limit', 0.0)
 
 TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
 
@@ -221,8 +222,6 @@ elif Callback_PNL_Short < 0.1:
 
 Active_TL_PNL_Long = get_float('mm', 'active_tl_pnl_long', 0.0)
 Active_TL_PNL_Short = get_float('mm', 'active_tl_pnl_short', 0.0)
-
-average_level = get_int('mm', 'average_level', 0)
 
 TP_Profit = get_float('mm', 'tp_profit', 0.0)
 SL_Profit = get_float('mm', 'sl_profit', 0.0)

@@ -52,6 +52,7 @@ limit_trade_long = 10
 limit_trade_short = 10
 
 not_trade = 10.0
+risk_limit = 50.0
 
 tpsl_mode = on
 ;tp_long = 12.0
@@ -109,7 +110,6 @@ rolling_period = 15
 ;active_tl_pnl_short = 0.50
 ;callback_pnl_short = 2.5
 
-;average_level = 5
 ;tp_profit = 3.0
 ;sl_profit = 1.0
 ;tp_profit_long = 2.0
