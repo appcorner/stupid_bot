@@ -4,6 +4,12 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## V1.5.01
+- ปรับปรุงการเปิด position และ order ให้ตรงกับ position mode
+- เพิ่มสามารถเปิด position และ order แบบ hedge
+- ปรับปรุงการจัดเก็บ orders history ใหม่ เพื่อรองรับ multi timeframe และ adaptive trailing
+
+
 ## v1.4.12
 - แสดง position เรียงตามกำไร
 - mm profit จะปิด position จากกำไรน้อยไปมาก
@@ -136,6 +142,9 @@ open futures order by cross signal between fast and slow indicator
     ;# ต.ย. margin_type = USDT,BUSD
     margin_type = USDT
 
+    ;# กำหนดเลข magic number เพื่อระบุใน order id ไม่เกิน 10 อักษร
+    magic_number = 99999
+
     ;# ระบุ symbol ที่ต้องการใน watch_list, back_list
     ;watch_list = BTCUSDT,BTCBUSD
     ;back_list = FTTUSDT,FTTBUSD
@@ -216,6 +225,10 @@ open futures order by cross signal between fast and slow indicator
     atr_multiple = 1.5
     ;# จำนวน tf n แท่ง ที่ใช้คำนวน ค่าเฉลี่ยของ High, Low และ Bollinger Bands
     rolling_period = 15
+
+    [hedge]
+    ;# กำหนด on เพื่อเลือกเทรดในช่วง sideway trend จะเปิด position แบบ hedge
+    sideway_trade = off
 
     [symbols_setting]
     ;# กำหนดค่า setting แยกตามเหรียญ
