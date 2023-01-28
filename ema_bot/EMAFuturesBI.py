@@ -28,7 +28,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 bot_name = 'EMA'
-bot_vesion = '1.4.12'
+bot_vesion = '1.5.01'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -826,7 +826,7 @@ def genClientOrderId(code):
     tmst = int(round(datetime.now().timestamp()*1000))
     gen_order_id = f"ema_{code}_{tmst}_{config.magic_number}"
     gen_order_id = gen_order_id[0:32]
-    logger.debug(gen_order_id)
+    # logger.debug(gen_order_id)
     return gen_order_id
 async def long_enter(exchange, symbol, amount, tf=config.timeframe):
     params={
@@ -1888,7 +1888,8 @@ async def update_all_positions():
                 if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list():
                     orders_history[symbol]['status'] = 'close'
 
-            logger.debug(orders_history.keys())
+            keysList = list(orders_history.keys())
+            logger.debug(f'symbol orders history: {keysList}')
             save_orders_history()
 
     except Exception as ex:
