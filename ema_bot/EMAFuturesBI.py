@@ -16,6 +16,7 @@ from logging.handlers import RotatingFileHandler
 from random import randint, shuffle
 from datetime import datetime
 import json
+from uuid import uuid4
 
 # -----------------------------------------------------------------------------
 # API_KEY, API_SECRET, LINE_NOTIFY_TOKEN in config.ini
@@ -120,6 +121,8 @@ orders_history = {}
 
 total_risk = {}
 is_send_notify_risk = False
+
+is_positionside_dual = False
 
 RSI30 = [30 for i in range(0, CANDLE_PLOT)]
 RSI50 = [50 for i in range(0, CANDLE_PLOT)]
@@ -236,7 +239,7 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     periods = 3
     lows_list = list(iday['low'])
     lows_list.reverse()
-    logger.debug(lows_list)
+    # logger.debug(lows_list)
     # swing_low = lows_list[0]
     swing_lows = []
     for i in range(len(lows_list)):
@@ -244,7 +247,7 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             # Check if the current price is the lowest in the last `periods` periods
             if min(lows_list[i-periods:i+1]) == lows_list[i]:
                 swing_lows.append(lows_list[i])
-    logger.debug(swing_lows)
+    # logger.debug(swing_lows)
 
     signalIdx = config.SignalIndex
     if symbol in symbols_setting.index:
@@ -270,8 +273,8 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
     tp = 0.0
     sl = 0.0
 
-    logger.debug(minimum_index)
-    logger.debug(maximum_index)
+    # logger.debug(minimum_index)
+    # logger.debug(maximum_index)
 
     # iday_minmax['sw_low'] = np.nan
     # iday_minmax['sw_high'] = np.nan
@@ -297,7 +300,6 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
                 if tp == 0.0 and closePrice < fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, minimum_price + difference * fibo_values[tp_fibo])
-            sl_fibo = minimum_price - difference * fibo_values[1]
         else:
             # maxidx = np.where(iday_minmax.index==maximum_index)[0][0]
             maxidx = iday_minmax.index.get_loc(maximum_index)
@@ -317,8 +319,8 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
                 if tp == 0.0 and closePrice < fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, new_minimum_price + difference * fibo_values[tp_fibo])
-            sl_fibo = new_minimum_price - difference * fibo_values[1]
 
+        sl_fibo = closePrice - difference * fibo_values[1]
         sl_sw = min(swing_lows[-config.SWING_TEST:])
         sl = min(sl_fibo, sl_sw)
 
@@ -335,7 +337,6 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
                 if tp == 0.0 and closePrice > fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, maximum_price - difference * fibo_values[tp_fibo])
-            sl_fibo = maximum_price + difference * fibo_values[1]
         else:
             # minidx = np.where(iday_minmax.index==minimum_index)[0][0]
             minidx = iday_minmax.index.get_loc(minimum_index)
@@ -355,8 +356,8 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
                 if tp == 0.0 and closePrice > fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, new_maximum_price - difference * fibo_values[tp_fibo])
-            sl_fibo = new_maximum_price + difference * fibo_values[1]
 
+        sl_fibo = closePrice + difference * fibo_values[1]
         sl_sw = max(swing_highs[-config.SWING_TEST:])
         sl = max(sl_fibo, sl_sw)
 
@@ -692,26 +693,33 @@ async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
 # order management zone --------------------------------------------------------
 def new_order_history(symbol):
     orders_history[symbol] = {
-        'position': 'new', 
+        'status': 'new', 
+        'positions': {}, 
         'win': 0, 
         'loss': 0, 
         'trade': 1,
-        'info': {},
         'last_loss': 0
     }
-def open_order_history(symbol, side='open', isTradeCount=True):
+def open_order_history(symbol, positionSide:str, isTradeCount=True):
     global orders_history
     if symbol not in orders_history.keys():
         new_order_history(symbol)
-    orders_history[symbol]['position'] = side
-    orders_history[symbol]['info'] = {}
+    orders_history[symbol]['status'] = 'open'
+    position = {}
+    position['info'] = {}
+    if positionSide.lower() == 'both':
+        orders_history[symbol]['positions'].pop("long", None)
+        orders_history[symbol]['positions'].pop("short", None)
+    else:
+        orders_history[symbol]['positions'].pop("both", None)
+    orders_history[symbol]['positions'][positionSide.lower()] = position
     if isTradeCount:
         orders_history[symbol]['trade'] = orders_history[symbol]['trade'] + 1
 def close_order_history(symbol):
     global orders_history
-    if symbol not in orders_history.keys():
+    if symbol in orders_history.keys():
         new_order_history(symbol)
-    orders_history[symbol]['position'] = 'close'
+    orders_history[symbol]['status'] = 'close'
     positions = all_positions[all_positions['symbol'] == symbol]
     positionInfo = positions.iloc[0]
     logger.debug(f'{symbol} close_order_history\n{positionInfo}')
@@ -724,33 +732,73 @@ def close_order_history(symbol):
     elif profit < 0:
         orders_history[symbol]['loss'] = orders_history[symbol]['loss'] + 1
         orders_history[symbol]['last_loss'] = orders_history[symbol]['last_loss'] + 1
-def update_order_history(symbol, side:str, order):
+def update_order_history(symbol, orderType:str, order):
     global orders_history
     if symbol not in orders_history.keys():
         new_order_history(symbol)
-    if 'info' not in orders_history[symbol].keys():
-        orders_history[symbol]['info'] = {}
     try:
-        if side.lower() == 'long' or side.lower() == 'short':
-            orders_history[symbol]['info']['side'] = side.lower()
-            orders_history[symbol]['info']['price'] = order['price']
-            orders_history[symbol]['info']['amount'] = order['amount']
-            orders_history[symbol]['info']['cost'] = order['cost']
-        elif side.lower() == 'tp':
-            orders_history[symbol]['info']['tp_price'] = order['stopPrice']
-            orders_history[symbol]['info']['tp_amount'] = order['amount']
-        elif side.lower() == 'sl':
-            orders_history[symbol]['info']['sl_price'] = order['stopPrice']
-            orders_history[symbol]['info']['sl_amount'] = order['amount']
-        elif side.lower() == 'tl':
-            orders_history[symbol]['info']['tl_activatePrice'] = order['info']['activatePrice']
-            orders_history[symbol]['info']['tl_amount'] = order['amount']
-            orders_history[symbol]['info']['tl_callback'] = order['info']['priceRate']
+        positionSide = str(order['info']['positionSide']).lower()
+        if positionSide not in orders_history[symbol]['positions'].keys():
+            position = {}
+            position['info'] = {}
+            orders_history[symbol]['positions'][positionSide] = position
+        elif 'info' not in orders_history[symbol]['positions'][positionSide].keys():
+            orders_history[symbol]['positions'][positionSide]['info'] = {}
+        
+        position_info = orders_history[symbol]['positions'][positionSide]['info']
+        if orderType.lower() == 'long' or orderType.lower() == 'short':
+            position_info['side'] = order['side']
+            position_info['clientOrderId'] = order['clientOrderId']
+            position_info['price'] = order['price']
+            position_info['amount'] = order['amount']
+            position_info['cost'] = order['cost']
+        elif orderType.lower() == 'tp':
+            position_info['tp_price'] = order['stopPrice']
+            position_info['tp_amount'] = order['amount']
+        elif orderType.lower() == 'sl':
+            position_info['sl_price'] = order['stopPrice']
+            position_info['sl_amount'] = order['amount']
+        elif orderType.lower() == 'tl':
+            position_info['tl_activatePrice'] = float(order['info']['activatePrice'])
+            position_info['tl_amount'] = order['amount']
+            position_info['tl_callback'] = float(order['info']['priceRate'])
+        elif orderType.lower() == 'close':
+            position_info['close_price'] = order['price']
+            position_info['close_amount'] = order['amount']
+        orders_history[symbol]['positions'][positionSide]['info'] = position_info
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception(f'update_order_history')
         pass
-
+async def update_open_orders(exchange, symbol):
+    global orders_history
+    if symbol not in orders_history.keys():
+        new_order_history(symbol)
+    open_orders = await exchange.fetch_open_orders(symbol)
+    logger.debug(f'{symbol} update_open_orders {open_orders}')
+    orders = {}
+    orders_code = {}
+    for order in open_orders:
+        positionSide = str(order['info']['positionSide']).lower()
+        if positionSide not in orders.keys():
+            orders[positionSide] = []
+            orders_code[positionSide] = ['..','..','..']
+        clientOrderId = str(order['clientOrderId'])
+        order_info = { 
+            'clientOrderId': clientOrderId,
+            'type': order['type'],
+            'stopPrice': order['stopPrice'],
+            'amount': order['amount'],
+        }
+        if order['type'] == 'trailing_stop_market':
+            orders_code[positionSide][2] = 'TL'
+        elif order['type'] == 'stop' or order['type'] == 'stop_market':
+            orders_code[positionSide][1] = 'SL'
+        elif order['type'] == 'take_profit_market':
+            orders_code[positionSide][0] = 'TP'
+        orders[positionSide].append(order_info)
+    orders_history[symbol]['positions']['orders'] = orders
+    orders_history[symbol]['positions']['orders_code'] = orders_code
 def save_orders_history():
     oh_json = [{
         'symbol':symbol,
@@ -760,67 +808,86 @@ def save_orders_history():
     } for symbol in orders_history.keys()]
     oh_df = pd.DataFrame(oh_json)
     oh_df.to_csv('./datas/orders_history.csv', index=False)
-async def update_open_orders(exchange, symbol):
+def save_orders_history_json(filename):
+    with open(filename,"w", encoding='utf8') as json_file:
+        json_string = json.dumps(orders_history, indent=2, ensure_ascii=False).encode('utf8')
+        json_file.write(json_string.decode())
+def load_orders_history_json(filename):
     global orders_history
-    if symbol not in orders_history.keys():
-        new_order_history(symbol)
-    open_orders = await exchange.fetch_open_orders(symbol)
-    # logger.debug(f'{symbol} update_open_orders {open_orders}')
-    tp_txt = '..'
-    sl_txt = '..'
-    tl_txt = '..'
-    orders = []
-    for order in open_orders:
-        order = { 
-            'type': order['type'],
-            'stopPrice': order['stopPrice'],
-            'amount': order['amount'],
-            'remaining': order['remaining']
-        }
-        if order['type'] == 'trailing_stop_market':
-            tl_txt = 'TL'
-        elif order['type'] == 'stop_market':
-            sl_txt = 'SL'
-        elif order['type'] == 'take_profit_market':
-            tp_txt = 'TP'
-        orders.append(order)
-    orders_history[symbol]['orders'] = orders
-    orders_history[symbol]['orders_code'] = f'{tp_txt}{sl_txt}{tl_txt}'
-def save_json(filename, jsonData):
-    file = open(filename,"w", encoding='utf8')
-    json_string = json.dumps(jsonData, indent=2, ensure_ascii=False).encode('utf8')
-    file.write(json_string.decode())
-    file.close()
+    if os.path.exists(filename):
+        with open(filename,"r", encoding='utf8') as json_file:
+            orders_history = json.load(json_file)
 
 # trading zone -----------------------------------------------------------------
-async def long_enter(exchange, symbol, amount):
-    order = await exchange.create_market_buy_order(symbol, amount)
+def genClientOrderId(code):
+    # order id len <= 32 chars
+    # format: {botname}_{tf}_{timestamp}_{magic number}
+    # sample: ema_3m_1674903982845_9999999999
+    tmst = int(round(datetime.now().timestamp()*1000))
+    gen_order_id = f"ema_{code}_{tmst}_{config.magic_number}"
+    gen_order_id = gen_order_id[0:32]
+    logger.debug(gen_order_id)
+    return gen_order_id
+async def long_enter(exchange, symbol, amount, tf=config.timeframe):
+    params={
+        "newClientOrderId": genClientOrderId(tf),
+    }
+    positionSide = "BOTH"
+    if is_positionside_dual:
+        positionSide = "LONG"
+    params["positionSide"] = positionSide
+    order = await exchange.create_market_order(symbol, 'buy', amount, params=params)
     # print("Status : LONG ENTERING PROCESSING...")
     logger.debug(f'{symbol} long_enter {str(order)}')
-    open_order_history(symbol, 'long')
+    open_order_history(symbol, positionSide.lower())
     update_order_history(symbol, 'long', order)
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def long_close(exchange, symbol, positionAmt):
-    order = await exchange.create_market_sell_order(symbol, positionAmt, params={"reduceOnly":True})
-    close_order_history(symbol)
+async def long_close(exchange, symbol, positionAmt, tf=config.timeframe):
+    params={
+        "newClientOrderId": genClientOrderId(tf),
+    }
+    if is_positionside_dual:
+        params["positionSide"] = "LONG"
+    else:
+        params["positionSide"] = "BOTH"
+        params["reduceOnly"] = True
+    order = await exchange.create_market_order(symbol, 'sell', positionAmt, params=params)
     logger.debug(f'{symbol} long_close {str(order)}')
+    close_order_history(symbol)
+    update_order_history(symbol, 'close', order)
     return
 #-------------------------------------------------------------------------------
-async def short_enter(exchange, symbol, amount):
-    order = await exchange.create_market_sell_order(symbol, amount)
+async def short_enter(exchange, symbol, amount, tf=config.timeframe):
+    params={
+        "newClientOrderId": genClientOrderId(tf),
+    }
+    positionSide = "BOTH"
+    if is_positionside_dual:
+        positionSide = "LONG"
+    params["positionSide"] = positionSide
+    order = await exchange.create_market_order(symbol, 'sell', amount, params=params)
     # print("Status : SHORT ENTERING PROCESSING...")
     logger.debug(f'{symbol} short_enter {str(order)}')
-    open_order_history(symbol, 'short')
+    open_order_history(symbol, positionSide.lower())
     update_order_history(symbol, 'short', order)
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def short_close(exchange, symbol, positionAmt):
-    order = await exchange.create_market_buy_order(symbol, (positionAmt*-1), params={"reduceOnly":True})
-    close_order_history(symbol)
+async def short_close(exchange, symbol, positionAmt, tf=config.timeframe):
+    params={
+        "newClientOrderId": genClientOrderId(tf),
+    }
+    if is_positionside_dual:
+        params["positionSide"] = "SHORT"
+    else:
+        params["positionSide"] = "BOTH"
+        params["reduceOnly"] = True
+    order = await exchange.create_market_order(symbol, 'buy', (positionAmt*-1), params=params)
     logger.debug(f'{symbol} short_close {str(order)}')
+    close_order_history(symbol)
+    update_order_history(symbol, 'close', order)
     return
 #-------------------------------------------------------------------------------
 async def cancel_order(exchange, symbol):
@@ -829,44 +896,59 @@ async def cancel_order(exchange, symbol):
     logger.debug(f'{symbol} cancel_order {str(order)}')
     return
 #-------------------------------------------------------------------------------
-async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
+async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate, tf=config.timeframe):
     closetp = closeRate/100.0
     closeamt = amount_to_precision(symbol, amount*closetp)
     if closeamt == 0.0:
         closeamt = amount
     logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeRate:{closeRate}, closeamt:{closeamt}')
-    params = {
-        'reduceOnly': True
-    }
+    params = {}
+    if is_positionside_dual:
+        params["positionSide"] = "LONG"
+    else:
+        params["positionSide"] = "BOTH"
     params['stopPrice'] = pricetp
-    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'sell', closeamt, PriceEntry, params)
+    params['triggerPrice'] = pricetp
+    params['newClientOrderId'] = genClientOrderId('tp')
+    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'sell', closeamt, pricetp, params=params)
     logger.debug(f'{symbol} long_TPSL-TP {str(order)}')
     update_order_history(symbol, 'tp', order)
     await sleep(1)
     params['stopPrice'] = pricesl
-    order = await exchange.create_order(symbol, 'STOP_MARKET', 'sell', amount, PriceEntry, params)
+    params['triggerPrice'] = pricesl
+    params['newClientOrderId'] = genClientOrderId('sl')
+    if not is_positionside_dual:
+        params["reduceOnly"] = True
+    order = await exchange.create_order(symbol, 'stop', 'sell', amount, pricesl, params=params)
     logger.debug(f'{symbol} long_TPSL-SL {str(order)}')
     update_order_history(symbol, 'sl', order)
     await sleep(1)
     return
 #-------------------------------------------------------------------------------
-async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
+async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate, tf=config.timeframe):
     closetp = closeRate/100.0
     closeamt = amount_to_precision(symbol, amount*closetp)
     if closeamt == 0.0:
         closeamt = amount
     logger.debug(f'{symbol}: amount:{amount}, PriceEntry:{PriceEntry}, pricetp:{pricetp}, pricesl:{pricesl}, closetp:{closetp}, closeRate:{closeRate}, closeamt:{closeamt}')
-    params = {
-        'quantityIsRequired': False, 
-        'reduceOnly': True
-    }
+    params = {}
+    if is_positionside_dual:
+        params["positionSide"] = "SHORT"
+    else:
+        params["positionSide"] = "BOTH"
     params['stopPrice'] = pricetp
-    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'buy', closeamt, PriceEntry, params)
+    params['triggerPrice'] = pricetp
+    params['newClientOrderId'] = genClientOrderId('tp')
+    order = await exchange.create_order(symbol, 'TAKE_PROFIT_MARKET', 'buy', closeamt, pricetp, params=params)
     logger.debug(f'{symbol} short_TPSL-TP {str(order)}')
     update_order_history(symbol, 'tp', order)
     await sleep(1)
     params['stopPrice'] = pricesl
-    order = await exchange.create_order(symbol, 'STOP_MARKET', 'buy', amount, PriceEntry, params)        
+    params['triggerPrice'] = pricesl
+    params['newClientOrderId'] = genClientOrderId('sl')
+    if not is_positionside_dual:
+        params["reduceOnly"] = True
+    order = await exchange.create_order(symbol, 'STOP', 'buy', amount, pricesl, params=params)        
     logger.debug(f'{symbol} short_TPSL-SL {str(order)}')
     update_order_history(symbol, 'sl', order)
     await sleep(1)
@@ -879,16 +961,20 @@ async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, clo
 #       and the latest price <= the highest price * (1 - callbackRate)
 # SELL: activationPrice should be larger than latest price.
 #-------------------------------------------------------------------------------
-async def long_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
+async def long_TLSTOP(exchange, symbol, amount, priceTL, callbackRate, tf=config.timeframe):
     params = {
-        'quantityIsRequired': False, 
+        "newClientOrderId": genClientOrderId('tl'),
         'callbackRate': callbackRate, 
-        'reduceOnly': True
     }
+    if is_positionside_dual:
+        params["positionSide"] = "LONG"
+    else:
+        params["positionSide"] = "BOTH"
+        params["reduceOnly"] = True
     if priceTL > 0:
         params['activationPrice'] = priceTL
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate:{callbackRate}')
-    order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, None, params)
+    order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'sell', amount, params=params)
     logger.debug(f'{symbol} long_TLSTOP {str(order)}')
     update_order_history(symbol, 'tl', order)
     activatePrice = float(order['info']['activatePrice'])
@@ -896,18 +982,22 @@ async def long_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
     await sleep(1)
     return activatePrice
 #-------------------------------------------------------------------------------
-async def short_TLSTOP(exchange, symbol, amount, priceTL, callbackRate):
+async def short_TLSTOP(exchange, symbol, amount, priceTL, callbackRate, tf=config.timeframe):
     params = {
-        'quantityIsRequired': False, 
+        "newClientOrderId": genClientOrderId('tl'),
         'callbackRate': callbackRate, 
-        'reduceOnly': True
     }
+    if is_positionside_dual:
+        params["positionSide"] = "SHORT"
+    else:
+        params["positionSide"] = "BOTH"
+        params["reduceOnly"] = True
     if priceTL > 0:
         params['activationPrice'] = priceTL
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, callbackRate: {callbackRate}')
-    order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, None, params)
+    order = await exchange.create_order(symbol, 'TRAILING_STOP_MARKET', 'buy', amount, params=params)
     logger.debug(f'{symbol} short_TLSTOP {str(order)}')
-    update_order_history(symbol, 'sl', order)
+    update_order_history(symbol, 'tl', order)
     activatePrice = float(order['info']['activatePrice'])
     logger.debug(f'{symbol} amount:{amount}, activationPrice:{priceTL}, activatePrice:{activatePrice}, callbackRate:{callbackRate}')
     await sleep(1)
@@ -1026,9 +1116,30 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             if sideways[signalIdx] == 1:
                 isLongEnter = False
                 isShortEnter = False
-                print(f"[{symbol}] สถานะ : Sideway Tread skipping...")
-                logger.info(f'{symbol} -> Sideway Tread')
-
+                if config.isSidewayTrade:
+                    if is_positionside_dual == True:
+                        isShortEnter = True
+                        isLongEnter = True
+                        # isShortEnter = hasShortPosition != True
+                        # hasShortPosition = False
+                        # isLongEnter = hasLongPosition != True
+                        # hasLongPosition == False
+                        print(f"[{symbol}] สถานะ : Sideway Trade Hedge Mode No")
+                        logger.info(f'{symbol} -> Sideway Trade Hedge Mode No')
+                    else:
+                        print(f"[{symbol}] สถานะ : Sideway Trade Hedge Mode Off skipping...")
+                        logger.info(f'{symbol} -> Sideway Trade Hedge Mode Off skipping...')
+                else:
+                    print(f"[{symbol}] สถานะ : Sideway Trend skipping...")
+                    logger.info(f'{symbol} -> Sideway Trend skipping...')
+            else:
+                if config.isSidewayTrade:
+                    isLongEnter = False
+                    # isLongExit == False
+                    isShortEnter = False
+                    # isShortExit == False
+                    print(f"[{symbol}] สถานะ : Not Sideway Trend skipping...")
+                    logger.info(f'{symbol} -> Not Sideway Trend skipping...')
         # print(symbol, isBullish, isBearish, fast, slow)
 
         closePrice = df.iloc[-1]["close"]
@@ -1039,6 +1150,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             count_trade_short = count_trade_short - 1 if count_trade_short > 0 else 0
             count_trade = count_trade_long + count_trade_short
             await short_close(exchange, symbol, positionAmt)
+            hasShortPosition = False
             print(f"[{symbol}] สถานะ : Short Exit processing...")
             await cancel_order(exchange, symbol)
             # line_notify(f'{symbol}\nสถานะ : Short Exit')
@@ -1048,6 +1160,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             count_trade_long = count_trade_long - 1 if count_trade_long > 0 else 0
             count_trade = count_trade_long + count_trade_short
             await long_close(exchange, symbol, positionAmt)
+            hasLongPosition = False
             print(f"[{symbol}] สถานะ : Long Exit processing...")
             await cancel_order(exchange, symbol)
             # line_notify(f'{symbol}\nสถานะ : Long Exit')
@@ -1084,7 +1197,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print('balance_entry', balance_entry[marginType])
                     await long_enter(exchange, symbol, amount)
                     print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
-                    await cancel_order(exchange, symbol)
+                    # await cancel_order(exchange, symbol)
                     notify_msg.append(f'สถานะ : Long\nCross Up\nราคา : {priceEntry}')
 
                     logger.debug(f'{symbol} LONG\n{df.tail(3)}')
@@ -1179,8 +1292,11 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 fibo_data['tp_txt'] = 'TP'
                 fibo_data['sl_txt'] = 'SL'
                 gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up', 'LONG', fibo_data) )
+        
+        notify_msg = []
+        notify_msg.append(symbol)
 
-        elif isShortEnter == True and config.Short == 'on' and hasShortPosition == False:
+        if isShortEnter == True and config.Short == 'on' and hasShortPosition == False:
             TPShort = config.TP_Short
             TPCloseShort = config.TP_Close_Short
             SLShort = config.SL_Short
@@ -1208,7 +1324,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                     print('balance_entry', balance_entry[marginType])
                     await short_enter(exchange, symbol, amount)
                     print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
-                    await cancel_order(exchange, symbol)
+                    # await cancel_order(exchange, symbol)
                     notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry}')
 
                     logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
@@ -1331,7 +1447,8 @@ async def load_all_symbols():
             'amount_precision':int(r['precision']['amount']),
             # 'price_precision':int(r['info']['pricePrecision']),
             'price_precision':int(r['precision']['price']),
-            } for r in mdf[['id','symbol','quote','precision','info']].to_dict('records')}
+            'limits_amount_min':int(r['limits']['amount']['min']),
+            } for r in mdf[['id','symbol','quote','precision','info','limits']].to_dict('records')}
         # print(all_symbols, len(all_symbols))
         # print(all_symbols.keys())
         if len(config.watch_list) > 0:
@@ -1433,26 +1550,36 @@ async def mm_strategy():
         sumShortProfit = sum([float(position['unrealizedProfit']) for position in mm_positions if float(position['positionAmt']) < 0])
         sumProfit = sumLongProfit + sumShortProfit
 
-        count_trade = len(mm_positions)
-        count_trade_long = sum([1 for position in mm_positions if float(position['positionAmt']) >= 0])
-        count_trade_short = sum([1 for position in mm_positions if float(position['positionAmt']) < 0])
+        sumLongMargin = sum([float(position['initialMargin']) for position in mm_positions if float(position['positionAmt']) >= 0])
+        sumShortMargin = sum([float(position['initialMargin']) for position in mm_positions if float(position['positionAmt']) < 0])
+        sumMargin = sumLongMargin + sumShortMargin
+
+        # count_trade = len(mm_positions)
+        # count_trade_long = sum([1 for position in mm_positions if float(position['positionAmt']) >= 0])
+        # count_trade_short = sum([1 for position in mm_positions if float(position['positionAmt']) < 0])
 
         # Money Management (MM) Strategy
-        logger.debug(f'MM Profit - Long[{sumLongProfit}] + Short[{sumShortProfit}] = All[{sumProfit}]')
+        logger.debug(f'MM Profit - Long[{sumLongProfit:.4f}] + Short[{sumShortProfit:.4f}] = All[{sumProfit:.4f}]')
         # logger.debug(f'PNL: {config.TP_PNL}, {config.SL_PNL}')
 
-        cost_percent = 1.0
+        cost_rate = 1.0
+        long_margin_rate = 1.0
+        short_margin_rate = 1.0
+        margin_rate = 1.0
         if config.is_percent_mode:
-            cost_percent = config.CostAmount / 100.0
+            cost_rate = config.CostAmount / 100.0
+            long_margin_rate = sumLongMargin / 100.0
+            short_margin_rate = sumShortMargin / 100.0
+            margin_rate = sumMargin / 100.0
 
-        tp_profit = config.TP_Profit * cost_percent
-        sl_profit = config.SL_Profit * cost_percent
-        tp_profit_long = config.TP_Profit_Long * cost_percent
-        sl_profit_long = config.SL_Profit_Long * cost_percent
-        tp_profit_short = config.TP_Profit_Short * cost_percent
-        sl_profit_short = config.SL_Profit_Short * cost_percent
+        tp_profit = config.TP_Profit * margin_rate
+        sl_profit = config.SL_Profit * margin_rate
+        tp_profit_long = config.TP_Profit_Long * long_margin_rate
+        sl_profit_long = config.SL_Profit_Long * long_margin_rate
+        tp_profit_short = config.TP_Profit_Short * short_margin_rate
+        sl_profit_short = config.SL_Profit_Short * short_margin_rate
 
-        logger.debug(f'MM TP/SL - All: {tp_profit}/-{sl_profit} Long: {tp_profit_long}/-{sl_profit_long} Short: {tp_profit_short}/-{sl_profit_short}')
+        logger.debug(f'MM TP/SL - All: {tp_profit:.4f}/-{sl_profit:.4f} Long: {tp_profit_long:.4f}/-{sl_profit_long:.4f} Short: {tp_profit_short:.4f}/-{sl_profit_short:.4f}')
 
         # close all positions by TP/SL profit setting
         if (tp_profit > 0 and sumProfit > tp_profit) or \
@@ -1530,7 +1657,7 @@ async def mm_strategy():
 
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
-                    line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
+                    line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumLongProfit:.4f}')
 
             # close all SHORT positions by SHORT TP/SL profit setting
             if isTPShortExit or isSLShortExit:
@@ -1562,15 +1689,12 @@ async def mm_strategy():
 
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
-                    line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumProfit:.4f}')
+                    line_notify(f'\nสถานะ...\n{txt_notify}\nProfit = {sumShortProfit:.4f}')
 
             # close target position by LONG/SHORT TP/SL PNL setting
             exit_loops = []
             cancel_loops = []
-            cost_rate = 1.0
-            if config.is_percent_mode:
-                cost_rate = config.CostAmount / 100.0
-            logger.debug(f'MM TP/SL PNL - Long: {config.TP_PNL_Long*cost_rate}/{-config.SL_PNL_Long*cost_rate} Short: {config.TP_PNL_Short*cost_rate}/{-config.SL_PNL_Long*cost_rate}')
+            logger.debug(f'MM TP/SL PNL - Long: {config.TP_PNL_Long*cost_rate:.4f}/{-config.SL_PNL_Long*cost_rate:.4f} Short: {config.TP_PNL_Short*cost_rate:.4f}/{-config.SL_PNL_Long*cost_rate:.4f}')
             if config.TP_PNL_Long > 0 and not isTPLongExit:
                 tp_lists = [position for position in mm_positions if 
                     float(position['positionAmt']) > 0.0 and 
@@ -1720,37 +1844,52 @@ async def update_all_positions():
         exchange = getExchange()
 
         balance = await exchange.fetch_balance()
-        # print(balance)
-        ex_positions = balance['info']['positions']
-        positions = [position for position in ex_positions 
-            if position['symbol'] in all_symbols.keys() and
-                all_symbols[position['symbol']]['quote'] in config.MarginType and 
-                float(position['positionAmt']) != 0]
-        
-        positions = sorted(positions, key=lambda k: float(k['unrealizedProfit']), reverse=True)
+        if balance:
+            # print(balance)
+            ex_positions = balance['info']['positions']
+            positions = [position for position in ex_positions 
+                if position['symbol'] in all_symbols.keys() and
+                    all_symbols[position['symbol']]['quote'] in config.MarginType and 
+                    float(position['positionAmt']) != 0]
+            
+            positions = sorted(positions, key=lambda k: float(k['unrealizedProfit']), reverse=True)
 
-        all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
-        all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
-        all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
-        all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
-        all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.4f}'.format(float(x)))
+            all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
+            all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
+            all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
+            all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
+            all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.4f}'.format(float(x)))
 
-        # update open order
-        loops = [update_open_orders(exchange, p['symbol']) for p in positions]
-        await gather(*loops)
+            # update open order
+            loops = [update_open_orders(exchange, symbol) for symbol in all_positions['symbol'].unique()]
+            await gather(*loops)
 
-        all_positions['orders'] = all_positions['symbol'].apply(lambda x: orders_history[x]['orders_code'])
-        
-        # clear order if no positions
-        loops = [cancel_order(exchange, symbol) for symbol in orders_history.keys() if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list()]
-        await gather(*loops)
+            def f(x):
+                symbol = x['symbol']
+                if is_positionside_dual:
+                    positionSide = str(x['positionSide']).lower()
+                else:
+                    positionSide = 'both'
+                if symbol in orders_history.keys() \
+                    and positionSide in orders_history[symbol]['positions']['orders_code'].keys():
+                    return ''.join(orders_history[symbol]['positions']['orders_code'][positionSide])
+                else:
+                    return '......'
+            # logger.debug(all_positions.apply(f, axis=1))
+            all_positions['orders'] = all_positions.apply(f, axis=1)
+            
+            # clear order if no positions
+            loops = [cancel_order(exchange, symbol) 
+                for symbol in orders_history.keys() 
+                    if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list()]
+            await gather(*loops)
 
-        for symbol in orders_history.keys():
-            if orders_history[symbol]['position'] == 'open' and symbol not in all_positions['symbol'].to_list():
-                orders_history[symbol]['position'] = 'close'
+            for symbol in orders_history.keys():
+                if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list():
+                    orders_history[symbol]['status'] = 'close'
 
-        logger.debug(orders_history)
-        save_orders_history()
+            logger.debug(orders_history.keys())
+            save_orders_history()
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -1766,7 +1905,9 @@ async def update_all_balance(notifyLine=False):
     global balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, total_risk
     try:
         balance = await update_all_positions()
-
+        if balance is None:
+            print('เกิดข้อผิดพลาดที่ ระบบ update balance')
+            return
         count_trade = len(all_positions)
         count_trade_long = sum(all_positions["positionSide"].map(lambda x : x == 'LONG'))
         count_trade_short = sum(all_positions["positionSide"].map(lambda x : x == 'SHORT'))
@@ -1889,8 +2030,26 @@ async def close_non_position_order(watch_list, positions_list):
     finally:
         await exchange.close()
 
+async def get_currentmode():
+    positionside_dual = False
+    try:
+        exchange = getExchange()
+        result = await exchange.fapiPrivate_get_positionside_dual()
+        positionside_dual = result['dualSidePosition']
+        print('positionside_dual:', positionside_dual)
+        logger.info(f'positionside_dual: {positionside_dual}')
+        
+    except Exception as e:
+        print(type(ex).__name__, str(ex))
+        logger.exception('get_currentmode')
+
+    finally:
+        await exchange.close()
+
+    return positionside_dual
+
 async def main():
-    global start_balance_total, is_send_notify_risk
+    global start_balance_total, is_send_notify_risk, is_positionside_dual
 
     marginList = ','.join(config.MarginType)
     if config.SANDBOX:
@@ -1907,9 +2066,14 @@ async def main():
 
     await set_all_leverage()
 
+    is_positionside_dual = await get_currentmode()
+
     # แสดงค่า positions & balance
     await update_all_balance(notifyLine=config.SummaryReport)
     start_balance_total = balalce_total
+
+    history_json_path = './datas/orders_history.json'
+    load_orders_history_json(history_json_path)
 
     await close_non_position_order(watch_list, all_positions['symbol'].to_list())
 
@@ -2035,5 +2199,5 @@ if __name__ == "__main__":
         if os.path.exists(history_file_path):
             os.rename(history_file_path, f'./datas/orders_history_{DATE_SUFFIX}.csv')
         history_json_path = './datas/orders_history.json'
-        save_json(history_json_path, orders_history)
+        save_orders_history_json(history_json_path)
         

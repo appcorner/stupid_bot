@@ -104,6 +104,7 @@ START_TRADE_TF = get_str('app_config', 'START_TRADE_TF', '4h')
 # setting
 #------------------------------------------------------------
 timeframe = get_str('setting', 'timeframe', '5m')
+magic_number = get_str('setting', 'magic_number', '12345')
 
 SignalIndex = get_int('setting', 'signal_index', -2)
 if SignalIndex > -1 or SignalIndex < -2:
@@ -185,6 +186,11 @@ isDetectSideway = get_str('setting', 'detect_sideway', 'on') == 'on'
 SidewayMode = get_int('setting', 'sideway_mode', 2)
 ATRMultiple = get_float('setting', 'atr_multiple', 1.5)
 RollingPeriod = get_int('setting', 'rolling_period', 15)
+
+#------------------------------------------------------------
+# hedge
+#------------------------------------------------------------
+isSidewayTrade = get_str('hedge', 'sideway_trade', 'off') == 'on'
 
 #------------------------------------------------------------
 # symbols_setting
