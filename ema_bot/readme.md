@@ -8,7 +8,7 @@ open futures order by cross signal between fast and slow indicator
 - ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
 - ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
 
-## V1.5.01
+## V1.5.1
 - ปรับปรุงการเปิด position และ order ให้ตรงกับ position mode
 - เพิ่มสามารถเปิด position และ order แบบ hedge
 - ปรับปรุงการจัดเก็บ orders history ใหม่ เพื่อรองรับ multi timeframe และ adaptive trailing
@@ -301,8 +301,8 @@ open futures order by cross signal between fast and slow indicator
 
 # download
 
-## v1.5.01
-- 
+## v1.5.1
+- https://mega.nz/file/SFRV3Dza#LyxH6IuJMhnU5hoThCXTF6Dh3OVbmBuNMGfsEF8zkrE
 
 ## v1.4.11
 - https://mega.nz/file/2EZE2SqZ#fiLVqGJMNP7QmrWBEILPJffqaxhPsVWOX421eR__hLc

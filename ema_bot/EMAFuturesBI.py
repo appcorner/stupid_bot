@@ -28,7 +28,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 bot_name = 'EMA'
-bot_vesion = '1.5.01'
+bot_vesion = '1.5.1'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -697,8 +697,8 @@ async def set_leverage(exchange, symbol):
         new_leverage = 5
         if type(ex).__name__ == 'ExchangeError' and '-4300' in str(ex):
             new_leverage = 20
-        print(exchange_symbol(symbol), f'found leverage error ({leverage}), Bot will set leverage = {new_leverage}')
-        logger.info(f'{symbol} {exchange_symbol(symbol)} found leverage error ({leverage}), Bot will set leverage = {new_leverage}')
+        print(exchange_symbol(symbol), f'found leverage {leverage} error, Bot will set leverage = {new_leverage}')
+        logger.info(f'{symbol} {exchange_symbol(symbol)} found leverage {leverage} error, Bot will set leverage = {new_leverage}')
 
         # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
         all_symbols[symbol]['leverage'] = new_leverage
