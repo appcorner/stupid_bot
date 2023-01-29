@@ -322,4 +322,4 @@ open futures order by cross signal between fast and slow indicator
 - ETH: 0xeAfe7f1Db46E2c007b60174EB4527ab38bd54B54
 - DOGE: DCkpCgt1HUVhCsvJVW7YA4E4NkxMsLHPz8
 - BINANCE PAY:
-![QR CODE](../app_binance.jpg)
+# ![QR CODE](../app_binance.jpg)
