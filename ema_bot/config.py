@@ -100,6 +100,8 @@ TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
 CB_AUTO_MODE = get_int('app_config', 'CB_AUTO_MODE', 1)
 START_TRADE_TF = get_str('app_config', 'START_TRADE_TF', '4h')
 
+IS_CLEAR_OLD_ORDER = get_str('app_config', 'CLEAR_OLD_ORDER', 'on') == 'on'
+
 #------------------------------------------------------------
 # setting
 #------------------------------------------------------------

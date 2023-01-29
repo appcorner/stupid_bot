@@ -124,6 +124,9 @@ is_send_notify_risk = False
 
 is_positionside_dual = False
 
+is_send_notify_error = True
+last_error_message = ''
+
 RSI30 = [30 for i in range(0, CANDLE_PLOT)]
 RSI50 = [50 for i in range(0, CANDLE_PLOT)]
 RSI70 = [70 for i in range(0, CANDLE_PLOT)]
@@ -499,6 +502,21 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None):
 
     return
 
+def line_notify_err(message):
+    global is_send_notify_error, last_error_message
+    if is_send_notify_error:
+        line_notify(message)
+        is_send_notify_error = False
+        last_error_message = ''
+    else:
+        last_error_message = message
+def line_notify_last_err():
+    global is_send_notify_error, last_error_message
+    if len(last_error_message):
+        line_notify(last_error_message)
+    is_send_notify_error = True
+    last_error_message = ''
+
 def line_notify(message):
     try:
         log_message = message.replace('\n', ',')
@@ -616,8 +634,14 @@ def add_indicator(symbol, bars):
 
     return df
 
+def patch_symbol(symbol:str, quote:str):
+    symbol_arr = f'{symbol}:{quote}'.split(':')
+    return ':'.join(symbol_arr[0:2])
+
 def exchange_symbol(symbol):
-    return ':'.join([all_symbols[symbol]['symbol'],all_symbols[symbol]['quote']])
+    # return ':'.join([all_symbols[symbol]['symbol'],all_symbols[symbol]['quote']])
+    # return all_symbols[symbol]['symbol']
+    return symbol
 
 """
 fetch_ohlcv - อ่านแท่งเทียน
@@ -643,7 +667,7 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
     except Exception as ex:
         print(type(ex).__name__, symbol, str(ex))
         logger.exception(f'fetch_ohlcv {symbol}')
-        line_notify(f'แจ้งปัญหาเหรียญ {symbol}:\nการอ่านแท่งเทียนผิดพลาด: {str(ex)}')
+        line_notify_err(f'แจ้งปัญหาเหรียญ {symbol}:\nการอ่านแท่งเทียนผิดพลาด: {str(ex)}')
         if limit == 0 and symbol in all_candles.keys():
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(1.5+(timestamp-last_candle_time)/timeframe_secs))
         if 'code' in ex.keys() and ex['code'] == -1130:
@@ -655,36 +679,35 @@ async def set_leverage(exchange, symbol):
     global all_symbols
     try:
         if config.automaxLeverage == "on":
-            symbol_ccxt = all_symbols[symbol]['symbol']
             params  = {"settle": all_symbols[symbol]['quote']}
-            lv_tiers = await exchange.fetchLeverageTiers([symbol], params=params)
-            leverage = int(lv_tiers[symbol_ccxt][0]['maxLeverage'])
-            # print(symbol, symbol_ccxt, leverage)
-            await exchange.set_leverage(leverage, symbol)
+            lv_tiers = await exchange.fetchLeverageTiers([exchange_symbol(symbol)], params=params)
+            leverage = int(lv_tiers[exchange_symbol(symbol)][0]['maxLeverage'])
+            # print(symbol, exchange_symbol(symbol), leverage)
+            await exchange.set_leverage(leverage, exchange_symbol(symbol))
         else:
             leverage = config.Leverage
             if symbol in symbols_setting.index:
                 leverage = int(symbols_setting.loc[symbol]['leverage'])
-            await exchange.set_leverage(leverage, symbol)
+            await exchange.set_leverage(leverage, exchange_symbol(symbol))
 
         # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
         all_symbols[symbol]['leverage'] = leverage
     except Exception as ex:
-        logger.debug(f'{symbol} {type(ex).__name__} {str(ex)}')
-        leverage = 5
+        logger.debug(f'{symbol} {exchange_symbol(symbol)} {type(ex).__name__} {str(ex)}')
+        new_leverage = 5
         if type(ex).__name__ == 'ExchangeError' and '-4300' in str(ex):
-            leverage = 20
-        print(symbol, f'found leverage error, Bot will set leverage = {leverage}')
-        logger.info(f'{symbol} found leverage error, Bot will set leverage = {leverage}')
+            new_leverage = 20
+        print(exchange_symbol(symbol), f'found leverage error ({leverage}), Bot will set leverage = {new_leverage}')
+        logger.info(f'{symbol} {exchange_symbol(symbol)} found leverage error ({leverage}), Bot will set leverage = {new_leverage}')
 
         # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
-        all_symbols[symbol]['leverage'] = leverage
+        all_symbols[symbol]['leverage'] = new_leverage
         try:
-            await exchange.set_leverage(leverage, symbol)
+            await exchange.set_leverage(new_leverage, exchange_symbol(symbol))
         except Exception as ex:
             # print(type(ex).__name__, str(ex))
-            print(symbol, f'can not set leverage')
-            logger.info(f'{symbol} can not set leverage')
+            print(exchange_symbol(symbol), f'can not set leverage')
+            logger.info(f'{exchange_symbol(symbol)} can not set leverage')
 
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
@@ -775,7 +798,7 @@ async def update_open_orders(exchange, symbol):
     if symbol not in orders_history.keys():
         new_order_history(symbol)
     open_orders = await exchange.fetch_open_orders(symbol)
-    logger.debug(f'{symbol} update_open_orders {open_orders}')
+    # logger.debug(f'{symbol} update_open_orders {open_orders}')
     orders = {}
     orders_code = {}
     for order in open_orders:
@@ -891,9 +914,14 @@ async def short_close(exchange, symbol, positionAmt, tf=config.timeframe):
     return
 #-------------------------------------------------------------------------------
 async def cancel_order(exchange, symbol):
-    await sleep(1)
-    order = await exchange.cancel_all_orders(symbol, params={'conditionalOrdersOnly':False})
-    logger.debug(f'{symbol} cancel_order {str(order)}')
+    try:
+        await sleep(1)
+        order = await exchange.cancel_all_orders(symbol, params={'conditionalOrdersOnly':False})
+        logger.debug(f'{symbol} cancel_order {str(order)}')
+    except Exception as ex:
+        print(type(ex).__name__, symbol, str(ex))
+        logger.exception(f'cancel_order {symbol}')
+        pass
     return
 #-------------------------------------------------------------------------------
 async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate, tf=config.timeframe):
@@ -905,8 +933,10 @@ async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, clos
     params = {}
     if is_positionside_dual:
         params["positionSide"] = "LONG"
+        SL_CMD = 'STOP'
     else:
         params["positionSide"] = "BOTH"
+        SL_CMD = 'STOP_MARKET'
     params['stopPrice'] = pricetp
     params['triggerPrice'] = pricetp
     params['newClientOrderId'] = genClientOrderId('tp')
@@ -919,7 +949,7 @@ async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, clos
     params['newClientOrderId'] = genClientOrderId('sl')
     if not is_positionside_dual:
         params["reduceOnly"] = True
-    order = await exchange.create_order(symbol, 'stop', 'sell', amount, pricesl, params=params)
+    order = await exchange.create_order(symbol, SL_CMD, 'sell', amount, pricesl, params=params)
     logger.debug(f'{symbol} long_TPSL-SL {str(order)}')
     update_order_history(symbol, 'sl', order)
     await sleep(1)
@@ -934,8 +964,10 @@ async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, clo
     params = {}
     if is_positionside_dual:
         params["positionSide"] = "SHORT"
+        SL_CMD = 'STOP'
     else:
         params["positionSide"] = "BOTH"
+        SL_CMD = 'STOP_MARKET'
     params['stopPrice'] = pricetp
     params['triggerPrice'] = pricetp
     params['newClientOrderId'] = genClientOrderId('tp')
@@ -948,7 +980,7 @@ async def short_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, clo
     params['newClientOrderId'] = genClientOrderId('sl')
     if not is_positionside_dual:
         params["reduceOnly"] = True
-    order = await exchange.create_order(symbol, 'STOP', 'buy', amount, pricesl, params=params)        
+    order = await exchange.create_order(symbol, SL_CMD, 'buy', amount, pricesl, params=params)        
     logger.debug(f'{symbol} short_TPSL-SL {str(order)}')
     update_order_history(symbol, 'sl', order)
     await sleep(1)
@@ -1423,7 +1455,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
     except Exception as ex:
         print(type(ex).__name__, symbol, str(ex))
         logger.exception(f'go_trade {symbol}')
-        line_notify(f'แจ้งปัญหาเหรียญ {symbol}\nการเทรดผิดพลาด: {ex}')
+        line_notify_err(f'แจ้งปัญหาเหรียญ {symbol}\nการเทรดผิดพลาด: {ex}')
         pass
 
 async def load_all_symbols():
@@ -1434,8 +1466,9 @@ async def load_all_symbols():
         # t1=time.time()
         markets = await exchange.fetch_markets()
         # print(markets[0])
-        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits','precision','info'])
-        mdf.drop(mdf[~mdf.quote.isin(config.MarginType)].index, inplace=True)
+        mdf = pd.DataFrame(markets, columns=['id','quote','symbol','limits','precision','info','settle'])
+        # mdf.drop(mdf[~mdf.quote.isin(config.MarginType)].index, inplace=True)
+        mdf.drop(mdf[~mdf.settle.isin(config.MarginType)].index, inplace=True)
         mdf.drop(mdf[mdf['id'].str.contains('_')].index, inplace=True)
         # print(mdf.head())
         # all_symbols = {r['id']:{'symbol':r['symbol'],'minAmount':r['minAmount']} for r in mdf[~mdf['id'].isin(drop_value)][['id','symbol','minAmount']].to_dict('records')}
@@ -1832,7 +1865,7 @@ async def mm_strategy():
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('mm_strategy')
-        line_notify(f'แจ้งปัญหาระบบ mm\nข้อผิดพลาด: {str(ex)}')
+        line_notify_err(f'แจ้งปัญหาระบบ mm\nข้อผิดพลาด: {str(ex)}')
         pass
 
     finally:
@@ -1857,8 +1890,8 @@ async def update_all_positions():
             all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
             all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
             all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
-            all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:,.4f}'.format(float(x)))
-            all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:,.4f}'.format(float(x)))
+            all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:.4f}'.format(float(x)))
+            all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:.4f}'.format(float(x)))
 
             # update open order
             loops = [update_open_orders(exchange, symbol) for symbol in all_positions['symbol'].unique()]
@@ -1895,7 +1928,7 @@ async def update_all_positions():
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_positions')
-        line_notify(f'แจ้งปัญหาระบบ update positions\nข้อผิดพลาด: {str(ex)}')
+        line_notify_err(f'แจ้งปัญหาระบบ update positions\nข้อผิดพลาด: {str(ex)}')
 
     finally:
         await exchange.close()
@@ -1974,7 +2007,7 @@ async def update_all_balance(notifyLine=False):
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_balance')
-        line_notify(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {str(ex)}')
+        line_notify_err(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {str(ex)}')
         pass
 
 async def load_symbols_setting():
@@ -2076,7 +2109,10 @@ async def main():
     history_json_path = './datas/orders_history.json'
     load_orders_history_json(history_json_path)
 
-    await close_non_position_order(watch_list, all_positions['symbol'].to_list())
+    if config.IS_CLEAR_OLD_ORDER:
+        await close_non_position_order(watch_list, all_positions['symbol'].to_list())
+    else:
+        print(f'skip close_non_position_order')
 
     time_wait = TIMEFRAME_SECONDS[config.timeframe] # กำหนดเวลาต่อ 1 รอบ
     time_wait_ub = UB_TIMER_SECONDS[config.UB_TIMER_MODE] # กำหนดเวลา update balance
@@ -2129,6 +2165,7 @@ async def main():
                 next_ticker_mm += time_wait_mm
 
                 is_send_notify_risk = False
+                line_notify_last_err()
 
                 await sleep(10)
 
@@ -2137,6 +2174,7 @@ async def main():
                 if config.Trade_Mode == 'on' and seconds >= next_ticker_mm:
                     await mm_strategy()
                     next_ticker_mm += time_wait_mm
+                    line_notify_last_err()
                 # display position
                 if config.Trade_Mode == 'on' and seconds >= next_ticker_ub + TIME_SHIFT:
                     # set cursor At top, left (1,1)
@@ -2145,6 +2183,7 @@ async def main():
                     print(f'last indicator: {local_time}, last balance: {balance_time}')
                     await update_all_balance()
                     next_ticker_ub += time_wait_ub
+                    line_notify_last_err()
 
             await sleep(1)
 

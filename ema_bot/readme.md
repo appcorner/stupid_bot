@@ -4,11 +4,19 @@
 
 open futures order by cross signal between fast and slow indicator
 
+## disclaimer (ข้อจำกัดความรับผิดชอบ)
+- ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
+- ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
+
 ## V1.5.01
 - ปรับปรุงการเปิด position และ order ให้ตรงกับ position mode
 - เพิ่มสามารถเปิด position และ order แบบ hedge
 - ปรับปรุงการจัดเก็บ orders history ใหม่ เพื่อรองรับ multi timeframe และ adaptive trailing
-
+- ปรับแก้การเลือกเหรียญ future ด้วยข้อมูลจาก settle ที่ตรงกับ margin type (มีการปรับโครงสร้างข้อมูลจาก api fetch_markets ใหม่)
+- ปรับการแจ้งเตือน error ทาง line เป็น error แรก และ error สุดท้าย ในการทำงานของแต่ละรอบ
+- กำหนด setting ในการเลือก clear order ที่ไม่มี postion ([app_config]CLEAR_OLD_ORDER) ในตอนเริ่มการทำงานครั้งแรก
+- ทดลองการเทรดในช่วง sideway โดยเปิด position แบบ hedge ([hedge]sideway_trade) ใช้ค่า TP SL TL ใน config
+- แก้ Bug การแปลงจำนวนหลักพัน
 
 ## v1.4.12
 - แสดง position เรียงตามกำไร
@@ -130,6 +138,12 @@ open futures order by cross signal between fast and slow indicator
 
     ;# คำนวน callback rate จาก 1 = TP, 2 = SL
     ;CB_AUTO_MODE = 1
+
+    ;# กำหนด timeframe ขั้นต่ำ ที่ต้องการเทรดเมื่อเริ่มการทำงานครั้งแรก (default = 4h)
+    ;START_TRADE_TF = 1h
+
+    ;# กำหนด on/off ในการเลือก clear order ที่ไม่มี postion ในตอนเริ่มการทำงานครั้งแรก
+    ;CLEAR_OLD_ORDER = off
 
     [setting]
     ;# 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d
@@ -286,6 +300,9 @@ open futures order by cross signal between fast and slow indicator
     loss_limit = 0
 
 # download
+
+## v1.5.01
+- 
 
 ## v1.4.11
 - https://mega.nz/file/2EZE2SqZ#fiLVqGJMNP7QmrWBEILPJffqaxhPsVWOX421eR__hLc
