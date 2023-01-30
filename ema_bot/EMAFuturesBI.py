@@ -640,8 +640,8 @@ def patch_symbol(symbol:str, quote:str):
 
 def exchange_symbol(symbol):
     # return ':'.join([all_symbols[symbol]['symbol'],all_symbols[symbol]['quote']])
-    # return all_symbols[symbol]['symbol']
-    return symbol
+    return all_symbols[symbol]['symbol']
+    # return symbol
 
 """
 fetch_ohlcv - อ่านแท่งเทียน
@@ -678,36 +678,43 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
 async def set_leverage(exchange, symbol):
     global all_symbols
     try:
+        ex_symbol = exchange_symbol(symbol)
         if config.automaxLeverage == "on":
-            params  = {"settle": all_symbols[symbol]['quote']}
-            lv_tiers = await exchange.fetchLeverageTiers([exchange_symbol(symbol)], params=params)
-            leverage = int(lv_tiers[exchange_symbol(symbol)][0]['maxLeverage'])
-            # print(symbol, exchange_symbol(symbol), leverage)
-            await exchange.set_leverage(leverage, exchange_symbol(symbol))
+            # params  = {"settle": all_symbols[symbol]['quote']}
+            # lv_tiers = await exchange.fetchLeverageTiers([ex_symbol], params=params)
+            # leverage = int(lv_tiers[ex_symbol][0]['maxLeverage'])
+            p_risks = await exchange.fetch_positions_risk([ex_symbol])
+            leverage = int([pr['leverage'] for pr in p_risks if pr['symbol'] == ex_symbol][0])
+            logger.debug(f'{symbol} {ex_symbol} {leverage}')
+            await exchange.set_leverage(leverage, ex_symbol)
         else:
             leverage = config.Leverage
             if symbol in symbols_setting.index:
                 leverage = int(symbols_setting.loc[symbol]['leverage'])
-            await exchange.set_leverage(leverage, exchange_symbol(symbol))
+            await exchange.set_leverage(leverage, ex_symbol)
 
         # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
         all_symbols[symbol]['leverage'] = leverage
     except Exception as ex:
-        logger.debug(f'{symbol} {exchange_symbol(symbol)} {type(ex).__name__} {str(ex)}')
-        new_leverage = 5
+        logger.debug(f'{symbol} {ex_symbol} {type(ex).__name__} {str(ex)}')
+        if config.automaxLeverage == "on":
+            new_leverage = 5
+        else:
+            p_risks = await exchange.fetch_positions_risk([ex_symbol])
+            new_leverage = int([pr['leverage'] for pr in p_risks if pr['symbol'] == ex_symbol][0])
         if type(ex).__name__ == 'ExchangeError' and '-4300' in str(ex):
-            new_leverage = 20
-        print(exchange_symbol(symbol), f'found leverage {leverage} error, Bot will set leverage = {new_leverage}')
-        logger.info(f'{symbol} {exchange_symbol(symbol)} found leverage {leverage} error, Bot will set leverage = {new_leverage}')
-
-        # เก็บค่า leverage ไว้ใน all_symbols เพื่อเอาไปใช้ต่อที่อื่น
-        all_symbols[symbol]['leverage'] = new_leverage
+            new_leverage = config.Leverage
+        print(ex_symbol, f'found leverage {leverage} error, Bot will set leverage = {new_leverage}')
+        logger.info(f'{symbol} {ex_symbol} found leverage {leverage} error, Bot will set leverage = {new_leverage}')
         try:
-            await exchange.set_leverage(new_leverage, exchange_symbol(symbol))
+            await exchange.set_leverage(new_leverage, ex_symbol)
+
+            all_symbols[symbol]['leverage'] = new_leverage
         except Exception as ex:
             # print(type(ex).__name__, str(ex))
-            print(exchange_symbol(symbol), f'can not set leverage')
-            logger.info(f'{exchange_symbol(symbol)} can not set leverage')
+            print(ex_symbol, f'can not set leverage')
+            logger.info(f'{ex_symbol} can not set leverage')
+            all_symbols[symbol]['leverage'] = 1
 
 async def fetch_ohlcv_trade(exchange, symbol, timeframe, limit=1, timestamp=0):
     await fetch_ohlcv(exchange, symbol, timeframe, limit, timestamp)
@@ -1181,22 +1188,35 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
         if tradeMode == 'on' and isShortExit == True and hasShortPosition == True:
             count_trade_short = count_trade_short - 1 if count_trade_short > 0 else 0
             count_trade = count_trade_long + count_trade_short
-            await short_close(exchange, symbol, positionAmt)
-            hasShortPosition = False
-            print(f"[{symbol}] สถานะ : Short Exit processing...")
-            await cancel_order(exchange, symbol)
-            # line_notify(f'{symbol}\nสถานะ : Short Exit')
-            gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short Exit', 'SHORT EXIT') )
-
+            try:
+                await short_close(exchange, symbol, positionAmt)
+                hasShortPosition = False
+                print(f"[{symbol}] สถานะ : Short Exit processing...")
+                await cancel_order(exchange, symbol)
+                # line_notify(f'{symbol}\nสถานะ : Short Exit')
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short Exit', 'SHORT EXIT') )
+            except Exception as ex:
+                print(type(ex).__name__, symbol, str(ex))
+                logger.exception(f'go_trade {symbol} short exit')
         elif tradeMode == 'on' and isLongExit == True and hasLongPosition == True:
             count_trade_long = count_trade_long - 1 if count_trade_long > 0 else 0
             count_trade = count_trade_long + count_trade_short
-            await long_close(exchange, symbol, positionAmt)
-            hasLongPosition = False
-            print(f"[{symbol}] สถานะ : Long Exit processing...")
-            await cancel_order(exchange, symbol)
-            # line_notify(f'{symbol}\nสถานะ : Long Exit')
-            gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long Exit', 'LONG EXIT') )
+            try:
+                await long_close(exchange, symbol, positionAmt)
+                hasLongPosition = False
+                print(f"[{symbol}] สถานะ : Long Exit processing...")
+                await cancel_order(exchange, symbol)
+                # line_notify(f'{symbol}\nสถานะ : Long Exit')
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long Exit', 'LONG EXIT') )
+            except Exception as ex:
+                print(type(ex).__name__, symbol, str(ex))
+                logger.exception(f'go_trade {symbol} short exit')
+        elif tradeMode == 'on' and (isLongEnter or isShortEnter):
+            try:
+                await cancel_order(exchange, symbol)
+            except Exception as ex:
+                print(type(ex).__name__, symbol, str(ex))
+                logger.exception(f'go_trade {symbol} cancel order')
 
         notify_msg = []
         notify_msg.append(symbol)
@@ -1570,6 +1590,9 @@ async def mm_strategy():
         exchange = getExchange()
 
         balance = await exchange.fetch_balance()
+        if balance is None:
+            print('เกิดข้อผิดพลาดที่ api fetch_balance')
+            return
         ex_positions = balance['info']['positions']
         mm_positions = [position for position in ex_positions 
             if position['symbol'] in all_symbols.keys() and
@@ -1800,6 +1823,9 @@ async def mm_strategy():
 
         # notify risk
         balance = await exchange.fetch_balance()
+        if balance is None:
+            print('เกิดข้อผิดพลาดที่ api fetch_balance')
+            return
         ex_positions = balance['info']['positions']
 
         for marginType in config.MarginType:
@@ -1877,53 +1903,55 @@ async def update_all_positions():
         exchange = getExchange()
 
         balance = await exchange.fetch_balance()
-        if balance:
-            # print(balance)
-            ex_positions = balance['info']['positions']
-            positions = [position for position in ex_positions 
-                if position['symbol'] in all_symbols.keys() and
-                    all_symbols[position['symbol']]['quote'] in config.MarginType and 
-                    float(position['positionAmt']) != 0]
-            
-            positions = sorted(positions, key=lambda k: float(k['unrealizedProfit']), reverse=True)
+        if balance is None:
+            print('เกิดข้อผิดพลาดที่ api fetch_balance')
+            return
+        # print(balance)
+        ex_positions = balance['info']['positions']
+        positions = [position for position in ex_positions 
+            if position['symbol'] in all_symbols.keys() and
+                all_symbols[position['symbol']]['quote'] in config.MarginType and 
+                float(position['positionAmt']) != 0]
+        
+        positions = sorted(positions, key=lambda k: float(k['unrealizedProfit']), reverse=True)
 
-            all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
-            all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
-            all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
-            all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:.4f}'.format(float(x)))
-            all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:.4f}'.format(float(x)))
+        all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
+        all_positions["positionSide"] = all_positions['positionAmt'].apply(lambda x: 'LONG' if float(x) >= 0 else 'SHORT')
+        all_positions["quote"] = all_positions['symbol'].apply(lambda x: all_symbols[x]['quote'])
+        all_positions['unrealizedProfit'] = all_positions['unrealizedProfit'].apply(lambda x: '{:.4f}'.format(float(x)))
+        all_positions['initialMargin'] = all_positions['initialMargin'].apply(lambda x: '{:.4f}'.format(float(x)))
 
-            # update open order
-            loops = [update_open_orders(exchange, symbol) for symbol in all_positions['symbol'].unique()]
-            await gather(*loops)
+        # update open order
+        loops = [update_open_orders(exchange, symbol) for symbol in all_positions['symbol'].unique()]
+        await gather(*loops)
 
-            def f(x):
-                symbol = x['symbol']
-                if is_positionside_dual:
-                    positionSide = str(x['positionSide']).lower()
-                else:
-                    positionSide = 'both'
-                if symbol in orders_history.keys() \
-                    and positionSide in orders_history[symbol]['positions']['orders_code'].keys():
-                    return ''.join(orders_history[symbol]['positions']['orders_code'][positionSide])
-                else:
-                    return '......'
-            # logger.debug(all_positions.apply(f, axis=1))
-            all_positions['orders'] = all_positions.apply(f, axis=1)
-            
-            # clear order if no positions
-            loops = [cancel_order(exchange, symbol) 
-                for symbol in orders_history.keys() 
-                    if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list()]
-            await gather(*loops)
+        def f(x):
+            symbol = x['symbol']
+            if is_positionside_dual:
+                positionSide = str(x['positionSide']).lower()
+            else:
+                positionSide = 'both'
+            if symbol in orders_history.keys() \
+                and positionSide in orders_history[symbol]['positions']['orders_code'].keys():
+                return ''.join(orders_history[symbol]['positions']['orders_code'][positionSide])
+            else:
+                return '......'
+        # logger.debug(all_positions.apply(f, axis=1))
+        all_positions['orders'] = all_positions.apply(f, axis=1)
+        
+        # clear order if no positions
+        loops = [cancel_order(exchange, symbol) 
+            for symbol in orders_history.keys() 
+                if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list()]
+        await gather(*loops)
 
-            for symbol in orders_history.keys():
-                if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list():
-                    orders_history[symbol]['status'] = 'close'
+        for symbol in orders_history.keys():
+            if orders_history[symbol]['status'] == 'open' and symbol not in all_positions['symbol'].to_list():
+                orders_history[symbol]['status'] = 'close'
 
-            keysList = list(orders_history.keys())
-            logger.debug(f'symbol orders history: {keysList}')
-            save_orders_history()
+        keysList = list(orders_history.keys())
+        logger.debug(f'symbol orders history: {keysList}')
+        save_orders_history()
 
     except Exception as ex:
         print(type(ex).__name__, str(ex))
@@ -1977,7 +2005,9 @@ async def update_all_balance(notifyLine=False):
             # balance_cal = (balance_entry[marginType] + sumMargin + sumProfit)
             balalce_total += marginBalance
             maintMargin = float(marginAsset['maintMargin'])
-            totalRisk = abs(maintMargin) / (balance_entry[marginType]+sumMargin) * 100
+            totalRisk = 0
+            if (balance_entry[marginType]+sumMargin) > 0:
+                totalRisk = abs(maintMargin) / (balance_entry[marginType]+sumMargin) * 100
             total_risk[marginType] = totalRisk
 
             margin_positions.columns = POSITION_COLUMNS_RENAME
