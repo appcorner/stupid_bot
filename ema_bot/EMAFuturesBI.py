@@ -28,7 +28,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 bot_name = 'EMA'
-bot_vesion = '1.5.1'
+bot_vesion = '1.5.2'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -1530,6 +1530,9 @@ async def load_all_symbols():
 async def set_all_leverage():
     try:
         exchange = getExchange()
+
+        if config.automaxLeverage == 'on':
+            print('auto max leverage...')
 
         # set leverage
         loops = [set_leverage(exchange, symbol) for symbol in watch_list]
