@@ -100,10 +100,13 @@ TP_FIBO = get_int('app_config', 'TP_FIBO', 2)
 CB_AUTO_MODE = get_int('app_config', 'CB_AUTO_MODE', 1)
 START_TRADE_TF = get_str('app_config', 'START_TRADE_TF', '4h')
 
+IS_CLEAR_OLD_ORDER = get_str('app_config', 'CLEAR_OLD_ORDER', 'on') == 'on'
+
 #------------------------------------------------------------
 # setting
 #------------------------------------------------------------
 timeframe = get_str('setting', 'timeframe', '5m')
+magic_number = get_str('setting', 'magic_number', '12345')
 
 SignalIndex = get_int('setting', 'signal_index', -2)
 if SignalIndex > -1 or SignalIndex < -2:
@@ -133,6 +136,7 @@ else:
     limit_Trade = 0 # no limit
 
 Not_Trade = get_float('setting', 'not_trade', 10.0)
+risk_limit = get_float('setting', 'risk_limit', 0.0)
 
 TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
 
@@ -191,6 +195,11 @@ STO_D_PERIOD = get_int('setting', 'sto_d_period', 3)
 
 STOEnterLong = get_int('setting', 'sto_enter_long', 20)
 STOEnterShort = get_int('setting', 'sto_enter_short', 80)
+
+#------------------------------------------------------------
+# hedge
+#------------------------------------------------------------
+isSidewayTrade = get_str('hedge', 'sideway_trade', 'off') == 'on'
 
 #------------------------------------------------------------
 # symbols_setting
