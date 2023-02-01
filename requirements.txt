@@ -1,0 +1,7 @@
+numpy
+pandas
+pandas-ta
+mplfinance
+requests
+ccxt
+python-binance
