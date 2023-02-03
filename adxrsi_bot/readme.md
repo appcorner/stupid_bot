@@ -281,3 +281,5 @@ open futures order by ADX+RSI[+STO] indicator
 # donate
 - ETH: 0xeAfe7f1Db46E2c007b60174EB4527ab38bd54B54
 - DOGE: DCkpCgt1HUVhCsvJVW7YA4E4NkxMsLHPz8
+- BINANCE PAY:
+# ![QR CODE](../app_binance.jpg)
