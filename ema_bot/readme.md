@@ -8,6 +8,12 @@ open futures order by cross signal between fast and slow indicator
 - ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
 - ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
 
+## V1.5.2a
+- แก้ปัญหาการ set auto leverage
+- ตรวจสอบปัญหาจากการทำงาน api balance
+- ปรับปรุง code ให้ดีขึ้น ได้แก่ การตรวจสอบ risk, cancel orders, order history
+- แก้ปัญหาอื่นๆที่พบ ได้แก่ order history, order ใน hedge mode
+
 ## V1.5.1
 - ปรับปรุงการเปิด position และ order ให้ตรงกับ position mode
 - เพิ่มสามารถเปิด position และ order แบบ hedge
@@ -300,6 +306,9 @@ open futures order by cross signal between fast and slow indicator
     loss_limit = 0
 
 # download
+
+## v1.5.2a
+- https://mega.nz/file/nBhBnRiK#HXU_w7oG8tXRewqEdnE8qmXMyFN9GNQWhHGcjJvKEVY
 
 ## v1.5.1
 - https://mega.nz/file/SFRV3Dza#LyxH6IuJMhnU5hoThCXTF6Dh3OVbmBuNMGfsEF8zkrE

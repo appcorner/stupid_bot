@@ -8,6 +8,12 @@ open futures order by ADX+RSI[+STO] indicator
 - ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
 - ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
 
+## V1.5.2 (ปรับเท่า EMA)
+- แก้ปัญหาการ set auto leverage
+- ตรวจสอบปัญหาจากการทำงาน api balance
+- ปรับปรุง code ให้ดีขึ้น ได้แก่ การตรวจสอบ risk, cancel orders, order history
+- แก้ปัญหาอื่นๆที่พบ ได้แก่ order history, order ใน hedge mode
+
 ## V1.5.1 (ปรับเท่า EMA)
 - ปรับปรุงการเปิด position และ order ให้ตรงกับ position mode
 - เพิ่มสามารถเปิด position และ order แบบ hedge
@@ -203,8 +209,8 @@ open futures order by ADX+RSI[+STO] indicator
     sto_enter_short = 80
 
     [hedge]
-    ;# กำหนด on เพื่อเลือกเทรดในช่วง sideway trend จะเปิด position แบบ hedge
-    sideway_trade = off
+    ;# กำหนด on เพื่อเปิด position แบบ hedge
+    hedge_trade = off
 
     [symbols_setting]
     ;# กำหนดค่า setting แยกตามเหรียญ
@@ -263,8 +269,8 @@ open futures order by ADX+RSI[+STO] indicator
 
 # download
 
-## v1.5.1
--
+## v1.5.2
+- https://mega.nz/file/3VYB2RAC#I04Y-A2PGIGItLXqSN4eq5_CmxPBFtEeBeTwUgh7JKo
 
 ## v1.1.4
 - https://mega.nz/file/7BpghRBQ#rk8YsEqTwwWdjbr4B8_TqdrpccdmGNVwzDLu3qFo7OA

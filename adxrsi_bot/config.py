@@ -199,7 +199,7 @@ STOEnterShort = get_int('setting', 'sto_enter_short', 80)
 #------------------------------------------------------------
 # hedge
 #------------------------------------------------------------
-isSidewayTrade = get_str('hedge', 'sideway_trade', 'off') == 'on'
+isHedgeTrade = get_str('hedge', 'hedge_trade', 'off') == 'on'
 
 #------------------------------------------------------------
 # symbols_setting
