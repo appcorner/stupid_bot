@@ -82,6 +82,7 @@ SANDBOX = (get_str('binance','sandbox', 'off') == 'on')
 LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 RemovePlot = (get_str('line','remove_plot', 'off') == 'on')
 SummaryReport = (get_str('line','summary_report', 'off') == 'on')
+is_notify_api_error = (get_str('line','notify_api_error', 'off') == 'on')
 
 #------------------------------------------------------------
 # app_config

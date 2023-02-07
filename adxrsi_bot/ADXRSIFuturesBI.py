@@ -31,7 +31,7 @@ if config.isSTOOn:
     bot_name = 'ADX+RSI+STO'
 else:
     bot_name = 'ADX+RSI'
-bot_vesion = '1.5.2'
+bot_vesion = '1.5.2b'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -133,15 +133,16 @@ symbols_setting = pd.DataFrame(columns=CSV_COLUMNS)
 history_file_csv = 'orders_history.csv'
 history_json_path = 'orders_history.json'
 
-def getExchange():
+async def getExchange():
     exchange = ccxt.binance({
         "apiKey": config.API_KEY,
         "secret": config.API_SECRET,
-        "options": {"defaultType": "future"},
+        "options": {"defaultType": "future", "adjustForTimeDifference": True},
         "enableRateLimit": True}
     )
     if config.SANDBOX:
         exchange.set_sandbox_mode(True)
+    await exchange.load_time_difference()
     return exchange
 
 def school_round(a_in,n_in):
@@ -447,6 +448,7 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None, **kwargs):
 
 def line_notify_err(message):
     global is_send_notify_error, last_error_message
+    is_send_notify_error = config.is_notify_api_error and is_send_notify_error
     if is_send_notify_error:
         line_notify(message)
         is_send_notify_error = False
@@ -488,6 +490,10 @@ def add_indicator(symbol, bars):
         df = df[~df.index.duplicated(keep='last')].tail(CANDLE_LIMIT)
 
     df = df.tail(CANDLE_LIMIT)
+
+    if symbol in all_candles.keys() and len(df) < CANDLE_SAVE:
+        print(f'less candles for {symbol}, skip add_indicator')
+        return
 
     # คำนวนค่าต่างๆใหม่
     df['ADX'] = 0
@@ -565,7 +571,7 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
         line_notify_err(f'แจ้งปัญหาเหรียญ {symbol}:\nการอ่านแท่งเทียนผิดพลาด: {str(ex)}')
         if limit == 0 and symbol in all_candles.keys():
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(1.5+(timestamp-last_candle_time)/timeframe_secs))
-        if 'code' in ex.keys() and ex['code'] == -1130:
+        if '"code":-1130' in str(ex):
             watch_list.remove(symbol)
             print(f'{symbol} is removed from watch_list')
             logger.debug(f'{symbol} is removed from watch_list')
@@ -1481,7 +1487,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 async def load_all_symbols():
     global all_symbols, watch_list
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         # t1=time.time()
         markets = await exchange.fetch_markets()
@@ -1498,9 +1504,9 @@ async def load_all_symbols():
             'quote':r['quote'],
             'leverage':1,
             'amount_precision':int(r['precision']['amount']),
-            # 'price_precision':int(r['info']['pricePrecision']),
             'price_precision':int(r['precision']['price']),
             'limits_amount_min':int(r['limits']['amount']['min']),
+            'limits_price_min':int(r['limits']['price']['min']),
             } for r in mdf[['id','symbol','quote','precision','info','limits']].to_dict('records')}
         # print(all_symbols, len(all_symbols))
         # print(all_symbols.keys())
@@ -1529,7 +1535,7 @@ async def load_all_symbols():
 
 async def set_all_leverage():
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         if config.automaxLeverage == 'on':
             print('auto max leverage...')
@@ -1547,7 +1553,7 @@ async def set_all_leverage():
 
 async def fetch_first_ohlcv():
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         # ครั้งแรกอ่าน 1000 แท่ง -> CANDLE_LIMIT
         limit = CANDLE_LIMIT
@@ -1570,7 +1576,7 @@ async def fetch_first_ohlcv():
 
 async def fetch_next_ohlcv(next_ticker):
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         # กำหนด limit การอ่านแท่งเทียนแบบ 0=ไม่ระบุจำนวน, n=จำนวน n แท่ง
         limit = 0
@@ -1590,7 +1596,7 @@ async def fetch_next_ohlcv(next_ticker):
 async def mm_strategy():
     global is_send_notify_risk
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         hasMMPositions = False
         balance = await exchange.fetch_balance()
@@ -1921,12 +1927,12 @@ async def mm_strategy():
 async def update_all_positions():
     global all_positions, orders_history
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         balance = await exchange.fetch_balance()
         if balance is None:
             print('เกิดข้อผิดพลาดที่ api fetch_balance')
-            return
+            return None
         # print(balance)
         ex_positions = balance['info']['positions']
         positions = [position for position in ex_positions 
@@ -1980,6 +1986,7 @@ async def update_all_positions():
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_positions')
         line_notify_err(f'แจ้งปัญหาระบบ update positions\nข้อผิดพลาด: {str(ex)}')
+        balance = None
 
     finally:
         await exchange.close()
@@ -2061,8 +2068,7 @@ async def update_all_balance(notifyLine=False):
         print(type(ex).__name__, str(ex))
         logger.exception('update_all_balance')
         line_notify_err(f'แจ้งปัญหาระบบ update balance\nข้อผิดพลาด: {str(ex)}')
-        pass
-
+        
 async def load_symbols_setting():
     global symbols_setting
     try:
@@ -2105,7 +2111,7 @@ async def load_symbols_setting():
 
 async def close_non_position_order(watch_list, positions_list):
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
 
         loops = [cancel_order(exchange, symbol, 'all') for symbol in watch_list if symbol not in positions_list]
         await gather(*loops)
@@ -2120,13 +2126,13 @@ async def close_non_position_order(watch_list, positions_list):
 async def get_currentmode():
     positionside_dual = False
     try:
-        exchange = getExchange()
+        exchange = await getExchange()
         result = await exchange.fapiPrivate_get_positionside_dual()
         positionside_dual = result['dualSidePosition']
         print('positionside_dual:', positionside_dual)
         logger.info(f'positionside_dual: {positionside_dual}')
         
-    except Exception as e:
+    except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('get_currentmode')
 

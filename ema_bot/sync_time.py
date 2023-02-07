@@ -13,6 +13,7 @@ try:
     print("time sync")
     os.system('net start w32time')
     os.system('w32tm /resync')
+    os.system('net stop w32time')
     print("after sync")
     response = client.request('pool.ntp.org')
     print(response.offset)
