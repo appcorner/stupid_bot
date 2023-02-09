@@ -553,7 +553,7 @@ def add_indicator(symbol, bars):
 
     if len(df) < CANDLE_SAVE:
         print(f'less candles for {symbol}, skip add_indicator')
-        return
+        return df
     
     # คำนวนค่าต่างๆใหม่
     df['fast'] = 0
@@ -661,6 +661,7 @@ limit: จำนวนแท่งที่ต้องการ, ใส่ 0 �
 timestamp: ระบุเวลาปัจจุบัน ถ้า limit=0
 """
 async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
+    global all_candles
     try:
         # กำหนดการอ่านแท่งเทียนแบบไม่ระบุจำนวน
         if limit == 0 and symbol in all_candles.keys():
@@ -679,7 +680,7 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
         line_notify_err(f'แจ้งปัญหาเหรียญ {symbol}:\nการอ่านแท่งเทียนผิดพลาด: {str(ex)}')
         if limit == 0 and symbol in all_candles.keys():
             print('----->', timestamp, last_candle_time, timestamp-last_candle_time, round(1.5+(timestamp-last_candle_time)/timeframe_secs))
-        if 'code' in ex.keys() and ex['code'] == -1130:
+        if '"code":-1130' in str(ex):
             watch_list.remove(symbol)
             print(f'{symbol} is removed from watch_list')
             logger.debug(f'{symbol} is removed from watch_list')
@@ -1611,7 +1612,8 @@ async def load_all_symbols():
         logger.exception('load_all_symbols')
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
 async def set_all_leverage():
     try:
@@ -1629,7 +1631,8 @@ async def set_all_leverage():
         logger.exception('set_all_leverage')
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
 async def fetch_first_ohlcv():
     try:
@@ -1652,7 +1655,8 @@ async def fetch_first_ohlcv():
         logger.exception('fetch_first_ohlcv')
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
 async def fetch_next_ohlcv(next_ticker):
     try:
@@ -1671,7 +1675,8 @@ async def fetch_next_ohlcv(next_ticker):
         logger.exception('fetch_next_ohlcv')
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
 async def mm_strategy():
     global is_send_notify_risk
@@ -1940,9 +1945,9 @@ async def mm_strategy():
                 totalRisk = abs(maintMargin) / (availableBalance+initialMargin) * 100
                 if is_send_notify_risk == False and (config.risk_limit > 0) and (totalRisk > config.risk_limit):
                     is_send_notify_risk = True
-                    logger.debug(f'MM Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
-                    line_notify(f'แจ้งเตือน\nRisk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
-                elif totalRisk <= config.risk_limit:
+                    logger.debug(f'MM {marginType} Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
+                    line_notify(f'แจ้งเตือน\n{marginType} Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
+                elif totalRisk < config.risk_limit - 10.0:
                     is_send_notify_risk = False
 
             # clear margin
@@ -1999,10 +2004,10 @@ async def mm_strategy():
         print(type(ex).__name__, str(ex))
         logger.exception('mm_strategy')
         line_notify_err(f'แจ้งปัญหาระบบ mm\nข้อผิดพลาด: {str(ex)}')
-        pass
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
 async def update_all_positions():
     global all_positions, orders_history
@@ -2069,7 +2074,8 @@ async def update_all_positions():
         balance = None
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
     return balance
 
@@ -2201,7 +2207,8 @@ async def close_non_position_order(watch_list, positions_list):
         logger.exception('update_all_balance')
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
 async def get_currentmode():
     positionside_dual = False
@@ -2217,7 +2224,8 @@ async def get_currentmode():
         logger.exception('get_currentmode')
 
     finally:
-        await exchange.close()
+        if exchange:
+            await exchange.close()
 
     return positionside_dual
 
@@ -2372,6 +2380,7 @@ if __name__ == "__main__":
     except Exception as ex:
         print(type(ex).__name__, str(ex))
         logger.exception('app')
+        line_notify(f'{bot_name} bot stop')
 
     finally:
         print(SHOW_CURSOR, end="")
@@ -2379,4 +2388,3 @@ if __name__ == "__main__":
         # if os.path.exists(history_file_csv):
         #     os.rename(history_file_csv, history_file_csv.replace('.csv', f'{DATE_SUFFIX}.csv'))
         # save_orders_history_json(history_json_path)
-        
