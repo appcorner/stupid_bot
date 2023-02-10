@@ -31,7 +31,7 @@ if config.isSTOOn:
     bot_name = 'ADX+RSI+STO'
 else:
     bot_name = 'ADX+RSI'
-bot_vesion = '1.5.2b'
+bot_vesion = '1.5.2c'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -142,7 +142,10 @@ async def getExchange():
     )
     if config.SANDBOX:
         exchange.set_sandbox_mode(True)
-    await exchange.load_time_difference()
+    try:
+        await exchange.load_time_difference()
+    except:
+        pass
     return exchange
 
 def school_round(a_in,n_in):

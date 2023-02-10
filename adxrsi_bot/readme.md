@@ -8,6 +8,9 @@ open futures order by ADX+RSI[+STO] indicator
 - ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
 - ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
 
+## V1.5.2c
+- แก้บัค เพิ่ม try except ตอน get api time
+
 ## V1.5.2b (ปรับเท่า EMA)
 - ปรับปรุง code เพื่อลดปัญหา timestamp
 
@@ -271,6 +274,9 @@ open futures order by ADX+RSI[+STO] indicator
     loss_limit = 0
 
 # download
+
+## v1.5.2c
+- https://mega.nz/file/eUokHYDa#Oa-hDTw14RsJaKll-go1c4oIlI6-oSSmgvwe8T74RRQ
 
 ## v1.5.2b
 - https://mega.nz/file/yFRRFCqA#7uoQXyaD50HDonS1VK7saC3qE1jUhNzGPM2WMcclkeY

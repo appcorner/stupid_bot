@@ -8,6 +8,9 @@ open futures order by cross signal between fast and slow indicator
 - ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
 - ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
 
+## V1.5.2c
+- แก้บัค เพิ่ม try except ตอน get api time
+
 ## V1.5.2b
 - ปรับปรุง code เพื่อลดปัญหา timestamp
 
@@ -309,6 +312,9 @@ open futures order by cross signal between fast and slow indicator
     loss_limit = 0
 
 # download
+
+## v1.5.2c
+- https://mega.nz/file/LJhGiSSK#P8jrlEtlfsfCzCh4L9CgBWce5uPupCOlRcB8piNrpdM
 
 ## v1.5.2b
 - https://mega.nz/file/Pd5lRKhR#zhd5SeG_3CNTtYs7jYY3tU_BUGWo8uUyP-0En1FXEng
