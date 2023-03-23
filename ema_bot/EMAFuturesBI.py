@@ -120,6 +120,7 @@ all_candles = {}
 orders_history = {}
 
 total_risk = {}
+total_margin = {}
 is_send_notify_risk = False
 
 is_positionside_dual = False
@@ -513,7 +514,11 @@ def line_notify_err(message):
     global is_send_notify_error, last_error_message
     is_send_notify_error = config.is_notify_api_error and is_send_notify_error
     if is_send_notify_error:
-        line_notify(message)
+        if '"code":-2015' in str(message):
+            if 'request ip:' in str(message):
+                line_notify(message)
+        else:
+            line_notify(message)
         is_send_notify_error = False
         last_error_message = ''
     else:
@@ -521,6 +526,8 @@ def line_notify_err(message):
 def line_notify_last_err():
     global is_send_notify_error, last_error_message
     if len(last_error_message):
+        if '"code":-2015' in str(last_error_message):
+            return
         line_notify(last_error_message)
     is_send_notify_error = True
     last_error_message = ''
@@ -932,6 +939,7 @@ async def long_close(exchange, symbol, positionAmt, tf=config.timeframe):
     logger.debug(f'{symbol} long_close {str(order)}')
     close_order_history(symbol, 'long')
     update_order_history(symbol, 'close', order)
+    await cancel_order(exchange, symbol, 'long')
     return
 #-------------------------------------------------------------------------------
 async def short_enter(exchange, symbol, amount, tf=config.timeframe):
@@ -963,6 +971,7 @@ async def short_close(exchange, symbol, positionAmt, tf=config.timeframe):
     logger.debug(f'{symbol} short_close {str(order)}')
     close_order_history(symbol, 'short')
     update_order_history(symbol, 'close', order)
+    await cancel_order(exchange, symbol, 'short')
     return
 #-------------------------------------------------------------------------------
 async def cancel_order(exchange, symbol, positionSide:str=None):
@@ -1162,7 +1171,7 @@ def crossover(tupleA, tupleB):
     return (tupleA[0] < tupleB[0] and tupleA[1] > tupleB[1])
 
 async def go_trade(exchange, symbol, chkLastPrice=True):
-    global all_positions, balance_entry, count_trade, count_trade_long, count_trade_short
+    global all_positions, balance_entry, count_trade, count_trade_long, count_trade_short, total_margin
 
     # delay เพื่อให้กระจายการ trade ของ symbol มากขึ้น
     delay = randint(5,10)
@@ -1269,8 +1278,6 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         closePrice = df.iloc[-1]["close"]
 
-        isRiskLimit = (config.risk_limit > 0) and (total_risk[marginType] > config.risk_limit)
-
         if tradeMode == 'on' and isShortExit == True and hasShortPosition == True:
             count_trade_short = count_trade_short - 1 if count_trade_short > 0 else 0
             count_trade = count_trade_long + count_trade_short
@@ -1278,7 +1285,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await short_close(exchange, symbol, positionAmt)
                 hasShortPosition = False
                 print(f"[{symbol}] สถานะ : Short Exit processing...")
-                await cancel_order(exchange, symbol, 'short')
+                # await cancel_order(exchange, symbol, 'short')
                 # line_notify(f'{symbol}\nสถานะ : Short Exit')
                 gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short Exit', 'SHORT EXIT') )
             except Exception as ex:
@@ -1291,276 +1298,305 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 await long_close(exchange, symbol, positionAmt)
                 hasLongPosition = False
                 print(f"[{symbol}] สถานะ : Long Exit processing...")
-                await cancel_order(exchange, symbol, 'long')
+                # await cancel_order(exchange, symbol, 'long')
                 # line_notify(f'{symbol}\nสถานะ : Long Exit')
                 gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long Exit', 'LONG EXIT') )
             except Exception as ex:
                 print(type(ex).__name__, symbol, str(ex))
                 logger.exception(f'go_trade {symbol} short exit')
-        elif tradeMode == 'on' and (isLongEnter or isShortEnter):
-            try:
-                await cancel_order(exchange, symbol, 'all')
-            except Exception as ex:
-                print(type(ex).__name__, symbol, str(ex))
-                logger.exception(f'go_trade {symbol} cancel order')
+        # elif tradeMode == 'on' and (isLongEnter or isShortEnter):
+        #     try:
+        #         await cancel_order(exchange, symbol, 'all')
+        #     except Exception as ex:
+        #         print(type(ex).__name__, symbol, str(ex))
+        #         logger.exception(f'go_trade {symbol} cancel order')
 
-        notify_msg = []
-        notify_msg.append(symbol)
+        isRiskLimit = (config.risk_limit > 0) and (total_risk[marginType] > config.risk_limit)
 
-        if isLongEnter == True and config.Long == 'on' and hasLongPosition == False:
-            TPLong = config.TP_Long
-            TPCloseLong = config.TP_Close_Long
-            SLLong = config.SL_Long
-            callbackLong = config.Callback_Long
-            activeTLLong = config.Active_TL_Long
-            if symbol in symbols_setting.index:
-                TPLong = float(symbols_setting.loc[symbol]['tp_long'])
-                TPCloseLong = float(symbols_setting.loc[symbol]['tp_close_long'])
-                SLLong = float(symbols_setting.loc[symbol]['sl_long'])
-                callbackLong = float(symbols_setting.loc[symbol]['callback_long'])
-                activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
+        if isRiskLimit:
 
-            print(f'{symbol:12} LONG')
-            fibo_data = cal_minmax_fibo(symbol, df, 'LONG', closePrice)
-            if tradeMode == 'on' and balance_entry[marginType] > config.Not_Trade and isRiskLimit == False \
-                and (config.limit_Trade > count_trade or config.limit_Trade_Long > count_trade_long) :
-                count_trade_long = count_trade_long + 1
-                count_trade = count_trade_long + count_trade_short
-                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
-                if amount <= 0.0:
-                    print(f"[{symbol}] Status : NOT TRADE LONG, Amount <= 0.0")
-                elif amount*priceEntry < 5.0:
-                    print(f"[{symbol}] Status : NOT TRADE LONG, Cost < 5.0")
-                else:
-                    # ปรับปรุงค่า balance_entry
-                    balance_entry[marginType] = balance_entry[marginType] - (amount * priceEntry / leverage)
-                    print('balance_entry', balance_entry[marginType])
-                    await long_enter(exchange, symbol, amount)
-                    print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
-                    # await cancel_order(exchange, symbol)
-                    notify_msg.append(f'สถานะ : Long\nCross Up\nราคา : {priceEntry}')
+            print(f"[{symbol}] RiskLimit {total_risk[marginType]:,.2f}% skipping...")
+            logger.info(f'{symbol} -> RiskLimit {total_risk[marginType]:,.2f}% skipping...')
 
-                    logger.debug(f'{symbol} LONG\n{df.tail(3)}')
+        else:
 
-                    closeRate = 100.0
-                    priceTL = 0.0
-                    if TPSLMode == 'on':
-                        notify_msg.append(f'# TPSL')
-                        if config.TP_PNL_Long > 0:
-                            closeRate = config.TP_PNL_Close_Long
-                            if config.is_percent_mode:
-                                pricetp = price_to_precision(symbol, priceEntry + (costAmount * (config.TP_PNL_Long / 100.0) / amount))
-                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}% @{pricetp}'
-                            else:
-                                pricetp = price_to_precision(symbol, priceEntry + (config.TP_PNL_Long / amount))
-                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}$ @{pricetp}'
-                            fibo_data['tp'] = pricetp
-                            if config.CB_AUTO_MODE == 1:
-                                fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
-                            if config.Active_TL_PNL_Long > 0:
-                                if config.is_percent_mode:
-                                    priceTL = price_to_precision(symbol, priceEntry + (costAmount * (config.Active_TL_PNL_Long / 100.0) / amount))
+            notify_msg = []
+            notify_msg.append(symbol)
+
+            if isLongEnter == True and config.Long == 'on' and hasLongPosition == False:
+                TPLong = config.TP_Long
+                TPCloseLong = config.TP_Close_Long
+                SLLong = config.SL_Long
+                callbackLong = config.Callback_Long
+                activeTLLong = config.Active_TL_Long
+                if symbol in symbols_setting.index:
+                    TPLong = float(symbols_setting.loc[symbol]['tp_long'])
+                    TPCloseLong = float(symbols_setting.loc[symbol]['tp_close_long'])
+                    SLLong = float(symbols_setting.loc[symbol]['sl_long'])
+                    callbackLong = float(symbols_setting.loc[symbol]['callback_long'])
+                    activeTLLong = float(symbols_setting.loc[symbol]['active_tl_long'])
+
+                print(f'{symbol:12} LONG')
+                fibo_data = cal_minmax_fibo(symbol, df, 'LONG', closePrice)
+                if tradeMode == 'on' and balance_entry[marginType] > config.Not_Trade \
+                    and (config.limit_Trade > count_trade or config.limit_Trade_Long > count_trade_long) :
+                    count_trade_long = count_trade_long + 1
+                    count_trade = count_trade_long + count_trade_short
+                    (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
+                    if amount <= 0.0:
+                        print(f"[{symbol}] Status : NOT TRADE LONG, Amount <= 0.0")
+                    elif amount*priceEntry < 5.0:
+                        print(f"[{symbol}] Status : NOT TRADE LONG, Cost < 5.0")
+                    else:
+                        marginAmount = (amount * priceEntry / leverage)
+                        availableBalance = balance_entry[marginType] - marginAmount
+                        totalMargin = total_margin[marginType] + marginAmount
+                        # calculate risk before open new opsition
+                        risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
+                        if config.risk_limit > 0 and risk > config.risk_limit:
+                            print(f"[{symbol}] Status : NOT TRADE LONG, RiskLimit {risk:,.2f}%")
+                        else:
+                            # ปรับปรุงค่า balance_entry
+                            balance_entry[marginType] = availableBalance
+                            total_margin[marginType] = totalMargin
+                            print('balance_entry', balance_entry[marginType])
+                            await cancel_order(exchange, symbol, 'long')
+                            await long_enter(exchange, symbol, amount)
+                            print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
+                            # await cancel_order(exchange, symbol)
+                            notify_msg.append(f'สถานะ : Long\nCross Up\nราคา : {priceEntry}')
+
+                            logger.debug(f'{symbol} LONG\n{df.tail(3)}')
+
+                            closeRate = 100.0
+                            priceTL = 0.0
+                            if TPSLMode == 'on':
+                                notify_msg.append(f'# TPSL')
+                                if config.TP_PNL_Long > 0:
+                                    closeRate = config.TP_PNL_Close_Long
+                                    if config.is_percent_mode:
+                                        pricetp = price_to_precision(symbol, priceEntry + (costAmount * (config.TP_PNL_Long / 100.0) / amount))
+                                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}% @{pricetp}'
+                                    else:
+                                        pricetp = price_to_precision(symbol, priceEntry + (config.TP_PNL_Long / amount))
+                                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Long:.2f}$ @{pricetp}'
+                                    fibo_data['tp'] = pricetp
+                                    if config.CB_AUTO_MODE == 1:
+                                        fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
+                                    if config.Active_TL_PNL_Long > 0:
+                                        if config.is_percent_mode:
+                                            priceTL = price_to_precision(symbol, priceEntry + (costAmount * (config.Active_TL_PNL_Long / 100.0) / amount))
+                                        else:
+                                            priceTL = price_to_precision(symbol, priceEntry + (config.Active_TL_PNL_Long / amount))
+                                    callbackLong = config.Callback_PNL_Long
                                 else:
-                                    priceTL = price_to_precision(symbol, priceEntry + (config.Active_TL_PNL_Long / amount))
-                            callbackLong = config.Callback_PNL_Long
-                        else:
-                            closeRate = TPCloseLong
-                            if TPLong > 0:
-                                pricetp = price_to_precision(symbol, priceEntry + (priceEntry * (TPLong / 100.0)))
-                                fibo_data['tp_txt'] = f'TP: {TPLong:.2f}% @{pricetp}'
-                                fibo_data['tp'] = pricetp
-                            else:
-                                pricetp = fibo_data['tp']
-                                fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
-                            if activeTLLong > 0:
-                                priceTL = price_to_precision(symbol, priceEntry + (priceEntry * (activeTLLong / 100.0)))
-                        notify_msg.append(fibo_data['tp_txt'])
-                        notify_msg.append(f'TP close: {closeRate:.2f}%')
-                        if config.SL_PNL_Long > 0:
-                            if config.is_percent_mode:
-                                pricesl = price_to_precision(symbol, priceEntry - (costAmount * (config.SL_PNL_Long / 100.0) / amount))
-                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl}'
-                            else:
-                                pricesl = price_to_precision(symbol, priceEntry - (config.SL_PNL_Long / amount))
-                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}$ @{pricesl}'
-                            fibo_data['sl'] = pricesl
-                            if config.CB_AUTO_MODE != 1:
-                                fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
-                        elif SLLong > 0:
-                            pricesl = price_to_precision(symbol, priceEntry - (priceEntry * (SLLong / 100.0)))
-                            fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl}'
-                            fibo_data['sl'] = pricesl
-                        else:
-                            pricesl = fibo_data['sl']
-                            fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl}'
-                        notify_msg.append(fibo_data['sl_txt'])
+                                    closeRate = TPCloseLong
+                                    if TPLong > 0:
+                                        pricetp = price_to_precision(symbol, priceEntry + (priceEntry * (TPLong / 100.0)))
+                                        fibo_data['tp_txt'] = f'TP: {TPLong:.2f}% @{pricetp}'
+                                        fibo_data['tp'] = pricetp
+                                    else:
+                                        pricetp = fibo_data['tp']
+                                        fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
+                                    if activeTLLong > 0:
+                                        priceTL = price_to_precision(symbol, priceEntry + (priceEntry * (activeTLLong / 100.0)))
+                                notify_msg.append(fibo_data['tp_txt'])
+                                notify_msg.append(f'TP close: {closeRate:.2f}%')
+                                if config.SL_PNL_Long > 0:
+                                    if config.is_percent_mode:
+                                        pricesl = price_to_precision(symbol, priceEntry - (costAmount * (config.SL_PNL_Long / 100.0) / amount))
+                                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}% @{pricesl}'
+                                    else:
+                                        pricesl = price_to_precision(symbol, priceEntry - (config.SL_PNL_Long / amount))
+                                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Long:.2f}$ @{pricesl}'
+                                    fibo_data['sl'] = pricesl
+                                    if config.CB_AUTO_MODE != 1:
+                                        fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
+                                elif SLLong > 0:
+                                    pricesl = price_to_precision(symbol, priceEntry - (priceEntry * (SLLong / 100.0)))
+                                    fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl}'
+                                    fibo_data['sl'] = pricesl
+                                else:
+                                    pricesl = fibo_data['sl']
+                                    fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl}'
+                                notify_msg.append(fibo_data['sl_txt'])
 
-                        await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
-                        print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
+                                await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
+                                print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
+                                
+                            if trailingStopMode == 'on' and closeRate < 100.0:
+                                notify_msg.append('# TrailingStop')
+                                if priceTL == 0.0:
+                                    # RR = 1
+                                    activationPrice = price_to_precision(symbol, priceEntry + abs(priceEntry - pricesl))
+                                else:
+                                    activationPrice = priceTL
+
+                                if callbackLong == 0.0:
+                                    callbackLong = fibo_data['callback_rate']
+                                    notify_msg.append(f'Call Back: (AUTO) {callbackLong:.2f}%')
+                                else:
+                                    notify_msg.append(f'Call Back: {callbackLong:.2f}%')
+
+                                activatePrice = await long_TLSTOP(exchange, symbol, amount, activationPrice, callbackLong)
+                                print(f'[{symbol}] Set Trailing Stop {activationPrice:.4f}')
+                                # callbackLong_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackLong])
+
+                                if priceTL == 0.0:
+                                    notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
+                                elif config.TP_PNL_Long > 0:
+                                    if config.is_percent_mode:
+                                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}% @{activatePrice}')
+                                    else:
+                                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}$ @{activatePrice}')
+                                elif activeTLLong > 0:
+                                    notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice}')
+
+                            gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG', fibo_data) )
+                    
+                elif tradeMode != 'on' :
+                    fibo_data['tp_txt'] = 'TP'
+                    fibo_data['sl_txt'] = 'SL'
+                    gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up', 'LONG', fibo_data) )
+            
+            notify_msg = []
+            notify_msg.append(symbol)
+
+            if isShortEnter == True and config.Short == 'on' and hasShortPosition == False:
+                TPShort = config.TP_Short
+                TPCloseShort = config.TP_Close_Short
+                SLShort = config.SL_Short
+                callbackShort = config.Callback_Short
+                activeTLShort = config.Active_TL_Short
+                if symbol in symbols_setting.index:
+                    TPShort = float(symbols_setting.loc[symbol]['tp_short'])
+                    TPCloseShort = float(symbols_setting.loc[symbol]['tp_close_short'])
+                    SLShort = float(symbols_setting.loc[symbol]['sl_short'])
+                    callbackShort = float(symbols_setting.loc[symbol]['callback_short'])
+                    activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
+
+                print(f'{symbol:12} SHORT')
+                fibo_data = cal_minmax_fibo(symbol, df, 'SHORT', closePrice)
+                if tradeMode == 'on' and balance_entry[marginType] > config.Not_Trade \
+                    and (config.limit_Trade > count_trade or config.limit_Trade_Short > count_trade_short) :
+                    count_trade_short = count_trade_short + 1
+                    count_trade = count_trade_long + count_trade_short
+                    (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
+                    if amount <= 0.0:
+                        print(f"[{symbol}] Status : NOT TRADE SHORT, Amount <= 0.0")
+                    elif amount*priceEntry < 5.0:
+                        print(f"[{symbol}] Status : NOT TRADE LONG, Cost < 5.0")
+                    else:
+                        marginAmount = (amount * priceEntry / leverage)
+                        availableBalance = balance_entry[marginType] - marginAmount
+                        totalMargin = total_margin[marginType] + marginAmount
+                        # calculate risk before open new opsition
+                        risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
+                        if config.risk_limit > 0 and risk > config.risk_limit:
+                            print(f"[{symbol}] Status : NOT TRADE LONG, RiskLimit {risk:,.2f}%")
+                        else:
+                            # ปรับปรุงค่า balance_entry
+                            balance_entry[marginType] = availableBalance
+                            total_margin[marginType] = totalMargin
+                            print('balance_entry', balance_entry[marginType])
+                            await cancel_order(exchange, symbol, 'short')
+                            await short_enter(exchange, symbol, amount)
+                            print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
+                            # await cancel_order(exchange, symbol)
+                            notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry}')
+
+                            logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
                         
-                    if trailingStopMode == 'on' and closeRate < 100.0:
-                        notify_msg.append('# TrailingStop')
-                        if priceTL == 0.0:
-                            # RR = 1
-                            activationPrice = price_to_precision(symbol, priceEntry + abs(priceEntry - pricesl))
-                        else:
-                            activationPrice = priceTL
-
-                        if callbackLong == 0.0:
-                            callbackLong = fibo_data['callback_rate']
-                            notify_msg.append(f'Call Back: (AUTO) {callbackLong:.2f}%')
-                        else:
-                            notify_msg.append(f'Call Back: {callbackLong:.2f}%')
-
-                        activatePrice = await long_TLSTOP(exchange, symbol, amount, activationPrice, callbackLong)
-                        print(f'[{symbol}] Set Trailing Stop {activationPrice:.4f}')
-                        # callbackLong_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackLong])
-
-                        if priceTL == 0.0:
-                            notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
-                        elif config.TP_PNL_Long > 0:
-                            if config.is_percent_mode:
-                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}% @{activatePrice}')
-                            else:
-                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Long:.2f}$ @{activatePrice}')
-                        elif activeTLLong > 0:
-                            notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice}')
-
-                    gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG', fibo_data) )
-                
-            elif tradeMode != 'on' :
-                fibo_data['tp_txt'] = 'TP'
-                fibo_data['sl_txt'] = 'SL'
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up', 'LONG', fibo_data) )
-        
-        notify_msg = []
-        notify_msg.append(symbol)
-
-        if isShortEnter == True and config.Short == 'on' and hasShortPosition == False:
-            TPShort = config.TP_Short
-            TPCloseShort = config.TP_Close_Short
-            SLShort = config.SL_Short
-            callbackShort = config.Callback_Short
-            activeTLShort = config.Active_TL_Short
-            if symbol in symbols_setting.index:
-                TPShort = float(symbols_setting.loc[symbol]['tp_short'])
-                TPCloseShort = float(symbols_setting.loc[symbol]['tp_close_short'])
-                SLShort = float(symbols_setting.loc[symbol]['sl_short'])
-                callbackShort = float(symbols_setting.loc[symbol]['callback_short'])
-                activeTLShort = float(symbols_setting.loc[symbol]['active_tl_short'])
-
-            print(f'{symbol:12} SHORT')
-            fibo_data = cal_minmax_fibo(symbol, df, 'SHORT', closePrice)
-            if tradeMode == 'on' and balance_entry[marginType] > config.Not_Trade and isRiskLimit == False \
-                and (config.limit_Trade > count_trade or config.limit_Trade_Short > count_trade_short) :
-                count_trade_short = count_trade_short + 1
-                count_trade = count_trade_long + count_trade_short
-                (priceEntry, amount) = await cal_amount(exchange, symbol, leverage, costType, costAmount, closePrice, chkLastPrice)
-                if amount <= 0.0:
-                    print(f"[{symbol}] Status : NOT TRADE SHORT, Amount <= 0.0")
-                elif amount*priceEntry < 5.0:
-                    print(f"[{symbol}] Status : NOT TRADE LONG, Cost < 5.0")
-                else:
-                    # ปรับปรุงค่า balance_entry
-                    balance_entry[marginType] = balance_entry[marginType] - (amount * priceEntry / leverage)
-                    print('balance_entry', balance_entry[marginType])
-                    await short_enter(exchange, symbol, amount)
-                    print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
-                    # await cancel_order(exchange, symbol)
-                    notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry}')
-
-                    logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
-                
-                    closeRate = 100.0
-                    priceTL = 0.0
-                    if TPSLMode == 'on':
-                        notify_msg.append(f'# TPSL')
-                        if config.TP_PNL_Short > 0:
-                            closeRate = config.TP_PNL_Close_Short
-                            if config.is_percent_mode:
-                                pricetp = price_to_precision(symbol, priceEntry - (costAmount * (config.TP_PNL_Short / 100.0) / amount))
-                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}% @{pricetp}'
-                            else:
-                                pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
-                                fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}$ @{pricetp}'          
-                            fibo_data['tp'] = pricetp
-                            if config.CB_AUTO_MODE == 1:
-                                fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
-                            if config.Active_TL_PNL_Short > 0:
-                                if config.is_percent_mode:
-                                    priceTL = price_to_precision(symbol, priceEntry - (costAmount * (config.Active_TL_PNL_Short / 100.0) / amount))
+                            closeRate = 100.0
+                            priceTL = 0.0
+                            if TPSLMode == 'on':
+                                notify_msg.append(f'# TPSL')
+                                if config.TP_PNL_Short > 0:
+                                    closeRate = config.TP_PNL_Close_Short
+                                    if config.is_percent_mode:
+                                        pricetp = price_to_precision(symbol, priceEntry - (costAmount * (config.TP_PNL_Short / 100.0) / amount))
+                                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}% @{pricetp}'
+                                    else:
+                                        pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
+                                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}$ @{pricetp}'          
+                                    fibo_data['tp'] = pricetp
+                                    if config.CB_AUTO_MODE == 1:
+                                        fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
+                                    if config.Active_TL_PNL_Short > 0:
+                                        if config.is_percent_mode:
+                                            priceTL = price_to_precision(symbol, priceEntry - (costAmount * (config.Active_TL_PNL_Short / 100.0) / amount))
+                                        else:
+                                            priceTL = price_to_precision(symbol, priceEntry - (config.Active_TL_PNL_Short / amount))
+                                    callbackShort = config.Callback_PNL_Short
                                 else:
-                                    priceTL = price_to_precision(symbol, priceEntry - (config.Active_TL_PNL_Short / amount))
-                            callbackShort = config.Callback_PNL_Short
-                        else:
-                            closeRate = TPCloseShort
-                            if TPShort > 0:
-                                pricetp = price_to_precision(symbol, priceEntry - (priceEntry * (TPShort / 100.0)))
-                                fibo_data['tp_txt'] = f'TP: {TPShort:.2f}% @{pricetp}'
-                                fibo_data['tp'] = pricetp
-                            else:
-                                pricetp = fibo_data['tp']
-                                fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
-                            if activeTLShort > 0:
-                                priceTL = price_to_precision(symbol, priceEntry - (priceEntry * (activeTLShort / 100.0)))
-                        notify_msg.append(fibo_data['tp_txt'])
-                        notify_msg.append(f'TP close: {closeRate:.2f}%')
-                        if config.SL_PNL_Short > 0:
-                            if config.is_percent_mode:
-                                pricesl = price_to_precision(symbol, priceEntry + (costAmount * (config.SL_PNL_Short / 100.0) / amount))
-                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl}'
-                            else:
-                                pricesl = price_to_precision(symbol, priceEntry + (config.SL_PNL_Short / amount))
-                                fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}$ @{pricesl}'
-                            fibo_data['sl'] = pricesl
-                            if config.CB_AUTO_MODE != 1:
-                                fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
-                        elif SLShort > 0:
-                            pricesl = price_to_precision(symbol, priceEntry + (priceEntry * (SLShort / 100.0)))
-                            fibo_data['sl_txt'] = f'SL: {SLShort:.2f}% @{pricesl}'
-                            fibo_data['sl'] = pricesl
-                        else:
-                            pricesl = fibo_data['sl']
-                            fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl}'
-                        notify_msg.append(fibo_data['sl_txt'])
+                                    closeRate = TPCloseShort
+                                    if TPShort > 0:
+                                        pricetp = price_to_precision(symbol, priceEntry - (priceEntry * (TPShort / 100.0)))
+                                        fibo_data['tp_txt'] = f'TP: {TPShort:.2f}% @{pricetp}'
+                                        fibo_data['tp'] = pricetp
+                                    else:
+                                        pricetp = fibo_data['tp']
+                                        fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
+                                    if activeTLShort > 0:
+                                        priceTL = price_to_precision(symbol, priceEntry - (priceEntry * (activeTLShort / 100.0)))
+                                notify_msg.append(fibo_data['tp_txt'])
+                                notify_msg.append(f'TP close: {closeRate:.2f}%')
+                                if config.SL_PNL_Short > 0:
+                                    if config.is_percent_mode:
+                                        pricesl = price_to_precision(symbol, priceEntry + (costAmount * (config.SL_PNL_Short / 100.0) / amount))
+                                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}% @{pricesl}'
+                                    else:
+                                        pricesl = price_to_precision(symbol, priceEntry + (config.SL_PNL_Short / amount))
+                                        fibo_data['sl_txt'] = f'SL PNL: {config.SL_PNL_Short:.2f}$ @{pricesl}'
+                                    fibo_data['sl'] = pricesl
+                                    if config.CB_AUTO_MODE != 1:
+                                        fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricesl)
+                                elif SLShort > 0:
+                                    pricesl = price_to_precision(symbol, priceEntry + (priceEntry * (SLShort / 100.0)))
+                                    fibo_data['sl_txt'] = f'SL: {SLShort:.2f}% @{pricesl}'
+                                    fibo_data['sl'] = pricesl
+                                else:
+                                    pricesl = fibo_data['sl']
+                                    fibo_data['sl_txt'] = f'SL: (AUTO) @{pricesl}'
+                                notify_msg.append(fibo_data['sl_txt'])
 
-                        await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
-                        print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
+                                await short_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
+                                print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
 
-                    if trailingStopMode == 'on' and closeRate < 100.0:
-                        notify_msg.append('# TrailingStop')
-                        if priceTL == 0.0:
-                            # RR = 1
-                            activationPrice = price_to_precision(symbol, priceEntry - abs(priceEntry - pricesl))
-                        else:
-                            activationPrice = priceTL
-                            
-                        if callbackShort == 0.0:
-                            callbackShort = fibo_data['callback_rate']
-                            notify_msg.append(f'Call Back: (AUTO) {callbackShort:.2f}%')
-                        else:
-                            notify_msg.append(f'Call Back: {callbackShort:.2f}%')
+                            if trailingStopMode == 'on' and closeRate < 100.0:
+                                notify_msg.append('# TrailingStop')
+                                if priceTL == 0.0:
+                                    # RR = 1
+                                    activationPrice = price_to_precision(symbol, priceEntry - abs(priceEntry - pricesl))
+                                else:
+                                    activationPrice = priceTL
+                                    
+                                if callbackShort == 0.0:
+                                    callbackShort = fibo_data['callback_rate']
+                                    notify_msg.append(f'Call Back: (AUTO) {callbackShort:.2f}%')
+                                else:
+                                    notify_msg.append(f'Call Back: {callbackShort:.2f}%')
 
-                        activatePrice = await short_TLSTOP(exchange, symbol, amount, activationPrice, callbackShort)
-                        print(f'[{symbol}] Set Trailing Stop {activatePrice}')
-                        # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
+                                activatePrice = await short_TLSTOP(exchange, symbol, amount, activationPrice, callbackShort)
+                                print(f'[{symbol}] Set Trailing Stop {activatePrice}')
+                                # callbackShort_str = ','.join(['{:.2f}%'.format(cb) for cb in callbackShort])
 
-                        if priceTL == 0.0:
-                            notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
-                        elif config.TP_PNL_Short > 0:
-                            if config.is_percent_mode:
-                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}% @{activatePrice}')
-                            else:
-                                notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}$ @{activatePrice}')
-                        elif activeTLShort > 0:
-                            notify_msg.append(f'Active Price: {activeTLShort:.2f}% @{activatePrice}')
+                                if priceTL == 0.0:
+                                    notify_msg.append(f'Active Price: (AUTO) @{activatePrice}')
+                                elif config.TP_PNL_Short > 0:
+                                    if config.is_percent_mode:
+                                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}% @{activatePrice}')
+                                    else:
+                                        notify_msg.append(f'Active Price PNL: {config.Active_TL_PNL_Short:.2f}$ @{activatePrice}')
+                                elif activeTLShort > 0:
+                                    notify_msg.append(f'Active Price: {activeTLShort:.2f}% @{activatePrice}')
 
-                    gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT', fibo_data) )
+                            gather( line_chart(symbol, df, '\n'.join(notify_msg), 'SHORT', fibo_data) )
 
-            elif tradeMode != 'on' :
-                fibo_data['tp_txt'] = 'TP'
-                fibo_data['sl_txt'] = 'SL'
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down', 'SHORT', fibo_data) )
+                elif tradeMode != 'on' :
+                    fibo_data['tp_txt'] = 'TP'
+                    fibo_data['sl_txt'] = 'SL'
+                    gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nCross Down', 'SHORT', fibo_data) )
 
     except Exception as ex:
         print(type(ex).__name__, symbol, str(ex))
@@ -1944,8 +1980,9 @@ async def mm_strategy():
                 marginAsset = [asset for asset in balance['info']['assets'] if asset['asset'] == marginType][0]
                 availableBalance = float(marginAsset['availableBalance'])
                 initialMargin = float(marginAsset['initialMargin'])
-                maintMargin = float(marginAsset['maintMargin'])
-                totalRisk = abs(maintMargin) / (availableBalance+initialMargin) * 100
+                # maintMargin = float(marginAsset['maintMargin'])
+                # maintMargin = config.maint_margin_ratio * initialMargin
+                totalRisk = (config.maint_margin_ratio * initialMargin) / (availableBalance + initialMargin) * 100
                 if is_send_notify_risk == False and (config.risk_limit > 0) and (totalRisk > config.risk_limit):
                     is_send_notify_risk = True
                     logger.debug(f'MM {marginType} Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
@@ -2083,7 +2120,7 @@ async def update_all_positions():
     return balance
 
 async def update_all_balance(notifyLine=False):
-    global balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, total_risk
+    global balance_entry, balalce_total, count_trade, count_trade_long, count_trade_short, total_risk, total_margin
     try:
         balance = await update_all_positions()
         if balance is None:
@@ -2123,11 +2160,12 @@ async def update_all_balance(notifyLine=False):
             # walletBalance = float(marginAsset['walletBalance'])
             # balance_cal = (balance_entry[marginType] + sumMargin + sumProfit)
             balalce_total += marginBalance
-            maintMargin = float(marginAsset['maintMargin'])
+            # maintMargin = float(marginAsset['maintMargin'])
             totalRisk = 0
             if (balance_entry[marginType]+sumMargin) > 0:
-                totalRisk = abs(maintMargin) / (balance_entry[marginType]+sumMargin) * 100
+                totalRisk = (config.maint_margin_ratio * sumMargin) / (balance_entry[marginType] + sumMargin) * 100
             total_risk[marginType] = totalRisk
+            total_margin[marginType] = sumMargin
 
             margin_positions.columns = POSITION_COLUMNS_RENAME
             if len(margin_positions) > 0:
