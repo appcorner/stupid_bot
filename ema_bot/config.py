@@ -138,7 +138,7 @@ else:
 
 Not_Trade = get_float('setting', 'not_trade', 10.0)
 risk_limit = get_float('setting', 'risk_limit', 0.0)
-maint_margin_ratio = get_float('setting', 'maint_margin_ratio', 4.0)
+maint_margin_ratio = get_float('setting', 'maint_margin_ratio', 0.4)
 
 TPSL_Mode = get_str('setting', 'tpsl_mode', 'on')
 
