@@ -695,16 +695,11 @@ async def fetch_ohlcv(exchange, symbol, timeframe, limit=1, timestamp=0):
             print(f'{symbol} is removed from watch_list')
             logger.debug(f'{symbol} is removed from watch_list')
 
-async def set_leverage(exchange, symbol):
+async def set_leverage(exchange, symbol, leverage):
     global all_symbols
     try:
         ex_symbol = exchange_symbol(symbol)
         if config.automaxLeverage == "on":
-            # params  = {"settle": all_symbols[symbol]['quote']}
-            # lv_tiers = await exchange.fetchLeverageTiers([ex_symbol], params=params)
-            # leverage = int(lv_tiers[ex_symbol][0]['maxLeverage'])
-            p_risks = await exchange.fetch_positions_risk([ex_symbol])
-            leverage = int([pr['leverage'] for pr in p_risks if pr['symbol'] == ex_symbol][0])
             logger.debug(f'{symbol} {ex_symbol} {leverage}')
             await exchange.set_leverage(leverage, ex_symbol)
         else:
@@ -718,10 +713,9 @@ async def set_leverage(exchange, symbol):
     except Exception as ex:
         logger.debug(f'{symbol} {ex_symbol} {type(ex).__name__} {str(ex)}')
         if config.automaxLeverage == "on":
-            new_leverage = 5
+            new_leverage = config.Leverage
         else:
-            p_risks = await exchange.fetch_positions_risk([ex_symbol])
-            new_leverage = int([pr['leverage'] for pr in p_risks if pr['symbol'] == ex_symbol][0])
+            new_leverage = 5
         if type(ex).__name__ == 'ExchangeError' and '-4300' in str(ex):
             new_leverage = config.Leverage
         print(ex_symbol, f'found leverage {leverage} error, Bot will set leverage = {new_leverage}')
@@ -1660,9 +1654,18 @@ async def set_all_leverage():
 
         if config.automaxLeverage == 'on':
             print('auto max leverage...')
-
-        # set leverage
-        loops = [set_leverage(exchange, symbol) for symbol in watch_list]
+            leverages = await exchange.fapiPrivateGetLeverageBracket()
+            def get_max_leverage(symbol):
+                leverage = [x for x in leverages if x['symbol'] == symbol][0]
+                if leverage:
+                    return max([int(x['initialLeverage']) for x in leverage['brackets']])
+                else:
+                    return config.Leverage
+            # ตั้ง leverage ให้เท่ากับ max leverage ของแต่ละเหรียญ
+            loops = [set_leverage(exchange, symbol, get_max_leverage(symbol)) for symbol in watch_list]
+        else:
+            # set default leverage
+            loops = [set_leverage(exchange, symbol, config.Leverage) for symbol in watch_list]
         await gather(*loops)
 
     except Exception as ex:
