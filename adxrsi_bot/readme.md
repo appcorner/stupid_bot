@@ -159,6 +159,10 @@ open futures order by ADX+RSI[+STO] indicator
 
     ;# กำหนดจำนวน positions ทั้ง long, short รวมกันจะไม่เกิน limit_trade
     limit_trade = 10
+    ;# กำหนค่า % risk ที่ต้องการให้หยุดเปิด position เมื่อ risk มีค่าเกิน risk_limit, กำหนดเป็นค่า 0.0 คือ no limit
+    risk_limit = 50.0
+    ;# กำหนดค่า maintanance margin ration ตามที่ binance กำหนด
+    maint_margin_ratio = 0.40
 
     ;# ถ้ากำหนด limit_trade = 0 จะไปใช้ค่า limit_trade_long และ limit_trade_short แทน
     ;# กำหนดจำนวน positions แยกตาม long, short จะไม่เกิน limit_trade_long และ limit_trade_short

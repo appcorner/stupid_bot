@@ -56,6 +56,8 @@ limit_trade_short = 10
 
 not_trade = 10.0
 risk_limit = 50.0
+;# กำหนดค่า maintanance margin ration ตามที่ binance กำหนด
+maint_margin_ratio = 0.40
 
 tpsl_mode = on
 ;tp_long = 12.0

@@ -28,7 +28,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 bot_name = 'EMA'
-bot_vesion = '1.5.2c'
+bot_vesion = '1.5.3'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -739,7 +739,7 @@ def new_order_history(symbol):
     global orders_history
     orders_history[symbol] = {
         'timestamp': 0,
-        'positions': {}, 
+        'positions': {},
         'orders': {},
         'orders_open': {}, 
         'win': 0, 
@@ -1417,7 +1417,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
                                 await long_TPSL(exchange, symbol, amount, priceEntry, pricetp, pricesl, closeRate)
                                 print(f'[{symbol}] Set TP {pricetp} SL {pricesl}')
-                                
+
                             if trailingStopMode == 'on' and closeRate < 100.0:
                                 notify_msg.append('# TrailingStop')
                                 if priceTL == 0.0:
@@ -1447,12 +1447,12 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                     notify_msg.append(f'Active Price: {activeTLLong:.2f}% @{activatePrice}')
 
                             gather( line_chart(symbol, df, '\n'.join(notify_msg), 'LONG', fibo_data) )
-                    
+
                 elif tradeMode != 'on' :
                     fibo_data['tp_txt'] = 'TP'
                     fibo_data['sl_txt'] = 'SL'
                     gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nCross Up', 'LONG', fibo_data) )
-            
+
             notify_msg = []
             notify_msg.append(symbol)
 
@@ -1500,7 +1500,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             notify_msg.append(f'สถานะ : Short\nCross Down\nราคา : {priceEntry}')
 
                             logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
-                        
+
                             closeRate = 100.0
                             priceTL = 0.0
                             if TPSLMode == 'on':
@@ -1512,7 +1512,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                         fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}% @{pricetp}'
                                     else:
                                         pricetp = price_to_precision(symbol, priceEntry - (config.TP_PNL_Short / amount))
-                                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}$ @{pricetp}'          
+                                        fibo_data['tp_txt'] = f'TP PNL: {config.TP_PNL_Short:.2f}$ @{pricetp}'
                                     fibo_data['tp'] = pricetp
                                     if config.CB_AUTO_MODE == 1:
                                         fibo_data['callback_rate'] = cal_callback_rate(symbol, priceEntry, pricetp)
@@ -1781,7 +1781,7 @@ async def mm_strategy():
             (sl_profit > 0 and sumProfit < -sl_profit):
 
             exit_loops = []
-            cancel_loops = []
+            # cancel_loops = []
             mm_notify = []
             # exit all positions
             for position in mm_positions:
@@ -1792,13 +1792,13 @@ async def mm_strategy():
                     exit_loops.append(long_close(exchange, symbol, positionAmt))
                     # line_notify(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
                     mm_notify.append(f'{symbol} : MM Long Exit')
-                    cancel_loops.append(cancel_order(exchange, symbol, 'long'))
+                    # cancel_loops.append(cancel_order(exchange, symbol, 'long'))
                 elif positionAmt < 0.0:
                     print(f"[{symbol}] สถานะ : MM Short Exit processing...")
                     exit_loops.append(short_close(exchange, symbol, positionAmt))
                     # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
                     mm_notify.append(f'{symbol} : MM Short Exit')
-                    cancel_loops.append(cancel_order(exchange, symbol, 'short'))
+                    # cancel_loops.append(cancel_order(exchange, symbol, 'short'))
 
             try:
                 if len(exit_loops) > 0:
@@ -1808,12 +1808,12 @@ async def mm_strategy():
                 print(type(ex).__name__, str(ex))
                 logger.exception('mm_strategy exit all')
 
-            try:
-                if len(cancel_loops) > 0:
-                    await gather(*cancel_loops)
-            except Exception as ex:
-                print(type(ex).__name__, str(ex))
-                logger.exception('mm_strategy cancel all')
+            # try:
+            #     if len(cancel_loops) > 0:
+            #         await gather(*cancel_loops)
+            # except Exception as ex:
+            #     print(type(ex).__name__, str(ex))
+            #     logger.exception('mm_strategy cancel all')
 
             if len(mm_notify) > 0:
                 txt_notify = '\n'.join(mm_notify)
@@ -1829,7 +1829,7 @@ async def mm_strategy():
             # close all LONG positions by LONG TP/SL profit setting
             if isTPLongExit or isSLLongExit:
                 exit_loops = []
-                cancel_loops = []
+                # cancel_loops = []
                 mm_notify = []
                 # exit all positions
                 for position in mm_positions:
@@ -1840,7 +1840,7 @@ async def mm_strategy():
                         exit_loops.append(long_close(exchange, symbol, positionAmt))
                         # line_notify(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
                         mm_notify.append(f'{symbol} : MM Long Exit')
-                        cancel_loops.append(cancel_order(exchange, symbol, 'long'))
+                        # cancel_loops.append(cancel_order(exchange, symbol, 'long'))
 
                 try:
                     if len(exit_loops) > 0:
@@ -1850,12 +1850,12 @@ async def mm_strategy():
                     print(type(ex).__name__, str(ex))
                     logger.exception('mm_strategy exit long')
 
-                try:
-                    if len(cancel_loops) > 0:
-                        await gather(*cancel_loops)
-                except Exception as ex:
-                    print(type(ex).__name__, str(ex))
-                    logger.exception('mm_strategy cancel long')
+                # try:
+                #     if len(cancel_loops) > 0:
+                #         await gather(*cancel_loops)
+                # except Exception as ex:
+                #     print(type(ex).__name__, str(ex))
+                #     logger.exception('mm_strategy cancel long')
 
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
@@ -1864,7 +1864,7 @@ async def mm_strategy():
             # close all SHORT positions by SHORT TP/SL profit setting
             if isTPShortExit or isSLShortExit:
                 exit_loops = []
-                cancel_loops = []
+                # cancel_loops = []
                 mm_notify = []
                 # exit all positions
                 for position in mm_positions:
@@ -1875,7 +1875,7 @@ async def mm_strategy():
                         exit_loops.append(short_close(exchange, symbol, positionAmt))
                         # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
                         mm_notify.append(f'{symbol} : MM Short Exit')
-                        cancel_loops.append(cancel_order(exchange, symbol, 'short'))
+                        # cancel_loops.append(cancel_order(exchange, symbol, 'short'))
 
                 try:
                     if len(exit_loops) > 0:
@@ -1885,12 +1885,12 @@ async def mm_strategy():
                     print(type(ex).__name__, str(ex))
                     logger.exception('mm_strategy exit short')
 
-                try:
-                    if len(cancel_loops) > 0:
-                        await gather(*cancel_loops)
-                except Exception as ex:
-                    print(type(ex).__name__, str(ex))
-                    logger.exception('mm_strategy cancel short')
+                # try:
+                #     if len(cancel_loops) > 0:
+                #         await gather(*cancel_loops)
+                # except Exception as ex:
+                #     print(type(ex).__name__, str(ex))
+                #     logger.exception('mm_strategy cancel short')
 
                 if len(mm_notify) > 0:
                     txt_notify = '\n'.join(mm_notify)
@@ -1898,7 +1898,7 @@ async def mm_strategy():
 
             # close target position by LONG/SHORT TP/SL PNL setting
             exit_loops = []
-            cancel_loops = []
+            # cancel_loops = []
             logger.debug(f'MM TP/SL PNL - Long: {config.TP_PNL_Long*cost_rate:.4f}/{-config.SL_PNL_Long*cost_rate:.4f} Short: {config.TP_PNL_Short*cost_rate:.4f}/{-config.SL_PNL_Long*cost_rate:.4f}')
             if config.TP_PNL_Long > 0 and not isTPLongExit:
                 tp_lists = [position for position in mm_positions if 
@@ -1913,7 +1913,7 @@ async def mm_strategy():
                     print(f"[{symbol}] สถานะ : MM Long Exit processing...")
                     exit_loops.append(long_close(exchange, symbol, positionAmt))
                     line_notify(f'{symbol}\nสถานะ : MM Long Exit\nPNL = {unrealizedProfit}')
-                    cancel_loops.append(cancel_order(exchange, symbol, 'long'))
+                    # cancel_loops.append(cancel_order(exchange, symbol, 'long'))
             if config.TP_PNL_Short > 0 and not isTPShortExit:
                 tp_lists = [position for position in mm_positions if 
                     float(position['positionAmt']) < 0.0 and 
@@ -1927,7 +1927,7 @@ async def mm_strategy():
                     print(f"[{symbol}] สถานะ : MM Short Exit processing...")
                     exit_loops.append(short_close(exchange, symbol, positionAmt))
                     line_notify(f'{symbol}\nสถานะ : MM Short Exit\nPNL = {unrealizedProfit}')
-                    cancel_loops.append(cancel_order(exchange, symbol, 'short'))
+                    # cancel_loops.append(cancel_order(exchange, symbol, 'short'))
             if config.SL_PNL_Long > 0 and not isSLLongExit:
                 sl_lists = [position for position in mm_positions if 
                     float(position['positionAmt']) > 0.0 and 
@@ -1941,7 +1941,7 @@ async def mm_strategy():
                     print(f"[{symbol}] สถานะ : MM Long Exit processing...")
                     exit_loops.append(long_close(exchange, symbol, positionAmt))
                     line_notify(f'{symbol}\nสถานะ : MM Long Exit\nPNL = {unrealizedProfit}')
-                    cancel_loops.append(cancel_order(exchange, symbol, 'long'))
+                    # cancel_loops.append(cancel_order(exchange, symbol, 'long'))
             if config.SL_PNL_Short > 0 and not isSLShortExit:
                 sl_lists = [position for position in mm_positions if 
                     float(position['positionAmt']) < 0.0 and 
@@ -1955,7 +1955,7 @@ async def mm_strategy():
                     print(f"[{symbol}] สถานะ : MM Short Exit processing...")
                     exit_loops.append(short_close(exchange, symbol, positionAmt))
                     line_notify(f'{symbol}\nสถานะ : MM Short Exit\nPNL = {unrealizedProfit}')
-                    cancel_loops.append(cancel_order(exchange, symbol, 'short'))
+                    # cancel_loops.append(cancel_order(exchange, symbol, 'short'))
 
             try:
                 if len(exit_loops) > 0:
@@ -1964,12 +1964,12 @@ async def mm_strategy():
             except Exception as ex:
                 print(type(ex).__name__, str(ex))
                 logger.exception('mm_strategy exit pnl')
-            try:
-                if len(cancel_loops) > 0:
-                    await gather(*cancel_loops)
-            except Exception as ex:
-                print(type(ex).__name__, str(ex))
-                logger.exception('mm_strategy cancel pnl')
+            # try:
+            #     if len(cancel_loops) > 0:
+            #         await gather(*cancel_loops)
+            # except Exception as ex:
+            #     print(type(ex).__name__, str(ex))
+            #     logger.exception('mm_strategy cancel pnl')
 
         if hasMMPositions == False:
             # notify risk
@@ -1995,7 +1995,7 @@ async def mm_strategy():
 
             # clear margin
             exit_loops = []
-            cancel_loops = []
+            # cancel_loops = []
             mm_notify = []
             # exit all positions
             for position in mm_positions:
@@ -2009,13 +2009,13 @@ async def mm_strategy():
                         exit_loops.append(long_close(exchange, symbol, positionAmt))
                         # line_notify(f'{symbol}\nสถานะ : MM Long Exit\nProfit = {sumProfit}')
                         mm_notify.append(f'{symbol} : MM Long Remove')
-                        cancel_loops.append(cancel_order(exchange, symbol, 'long'))
+                        # cancel_loops.append(cancel_order(exchange, symbol, 'long'))
                     elif positionAmt < 0.0:
                         print(f"[{symbol}] สถานะ : MM Short Exit processing...")
                         exit_loops.append(short_close(exchange, symbol, positionAmt))
                         # line_notify(f'{symbol}\nสถานะ : MM Short Exit\nProfit = {sumProfit}')
                         mm_notify.append(f'{symbol} : MM Short Remove')
-                        cancel_loops.append(cancel_order(exchange, symbol, 'short'))
+                        # cancel_loops.append(cancel_order(exchange, symbol, 'short'))
 
             try:
                 if len(exit_loops) > 0:
@@ -2024,12 +2024,12 @@ async def mm_strategy():
                 print(type(ex).__name__, str(ex))
                 logger.exception('mm_strategy clear exit')
 
-            try:
-                if len(cancel_loops) > 0:
-                    await gather(*cancel_loops)
-            except Exception as ex:
-                print(type(ex).__name__, str(ex))
-                logger.exception('mm_strategy clear cancel')
+            # try:
+            #     if len(cancel_loops) > 0:
+            #         await gather(*cancel_loops)
+            # except Exception as ex:
+            #     print(type(ex).__name__, str(ex))
+            #     logger.exception('mm_strategy clear cancel')
 
             if len(mm_notify) > 0:
                 txt_notify = '\n'.join(mm_notify)
@@ -2067,7 +2067,7 @@ async def update_all_positions():
             if position['symbol'] in all_symbols.keys() and
                 all_symbols[position['symbol']]['quote'] in config.MarginType and 
                 float(position['positionAmt']) != 0]
-        
+
         positions = sorted(positions, key=lambda k: float(k['unrealizedProfit']), reverse=True)
 
         all_positions = pd.DataFrame(positions, columns=POSITION_COLUMNS)
@@ -2093,7 +2093,7 @@ async def update_all_positions():
                 return '......'
         # logger.debug(all_positions.apply(f, axis=1))
         all_positions['orders'] = all_positions.apply(f, axis=1)
-        
+
         # clear order if no positions
         loops = []
         for symbol in orders_history.keys():

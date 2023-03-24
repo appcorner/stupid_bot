@@ -198,6 +198,8 @@ open futures order by cross signal between fast and slow indicator
     not_trade = 10.0
     ;# กำหนค่า % risk ที่ต้องการให้หยุดเปิด position เมื่อ risk มีค่าเกิน risk_limit, กำหนดเป็นค่า 0.0 คือ no limit
     risk_limit = 50.0
+    ;# กำหนดค่า maintanance margin ration ตามที่ binance กำหนด
+    maint_margin_ratio = 0.40
 
     ;# กำหนด on/off สำหรับ order TP LS
     tpsl_mode = on
