@@ -319,6 +319,9 @@ open futures order by cross signal between fast and slow indicator
 
 # download
 
+## v1.5.3
+- https://mega.nz/file/HFQXQRLQ#qPfLOKaGH2sRCOSKaCChYnuZXU0GsFuqUIk8P1T05sI
+
 ## v1.5.2c
 - https://mega.nz/file/LJhGiSSK#P8jrlEtlfsfCzCh4L9CgBWce5uPupCOlRcB8piNrpdM
 
