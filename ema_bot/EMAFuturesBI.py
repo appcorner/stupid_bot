@@ -1983,9 +1983,13 @@ async def mm_strategy():
                 marginAsset = [asset for asset in balance['info']['assets'] if asset['asset'] == marginType][0]
                 availableBalance = float(marginAsset['availableBalance'])
                 initialMargin = float(marginAsset['initialMargin'])
-                # maintMargin = float(marginAsset['maintMargin'])
-                # maintMargin = config.maint_margin_ratio * initialMargin
-                totalRisk = (config.maint_margin_ratio * initialMargin) / (availableBalance + initialMargin) * 100
+                maintMargin = float(marginAsset['maintMargin'])
+                maintMarginCal = config.maint_margin_ratio * initialMargin
+                maint_margin_ratio = maintMargin / initialMargin
+                totalRisk = 0
+                if (availableBalance + initialMargin) > 0:
+                    totalRisk = (maintMargin) / (availableBalance + initialMargin) * 100
+                logger.debug(f'maintMargin ({maint_margin_ratio}) {maintMargin} ({config.maint_margin_ratio}) {maintMarginCal} risk {totalRisk}')
                 if is_send_notify_risk == False and (config.risk_limit > 0) and (totalRisk > config.risk_limit):
                     is_send_notify_risk = True
                     logger.debug(f'MM {marginType} Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
@@ -2163,10 +2167,14 @@ async def update_all_balance(notifyLine=False):
             # walletBalance = float(marginAsset['walletBalance'])
             # balance_cal = (balance_entry[marginType] + sumMargin + sumProfit)
             balalce_total += marginBalance
-            # maintMargin = float(marginAsset['maintMargin'])
+
+            maintMargin = float(marginAsset['maintMargin'])
+            config.maint_margin_ratio = maintMargin / sumMargin
+            
             totalRisk = 0
-            if (balance_entry[marginType]+sumMargin) > 0:
-                totalRisk = (config.maint_margin_ratio * sumMargin) / (balance_entry[marginType] + sumMargin) * 100
+            if (balance_entry[marginType] + sumMargin) > 0:
+                # totalRisk = (config.maint_margin_ratio * sumMargin) / (balance_entry[marginType] + sumMargin) * 100
+                totalRisk = (maintMargin) / (balance_entry[marginType] + sumMargin) * 100
             total_risk[marginType] = totalRisk
             total_margin[marginType] = sumMargin
 
