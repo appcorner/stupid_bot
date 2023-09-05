@@ -198,6 +198,10 @@ STO_D_PERIOD = get_int('setting', 'sto_d_period', 3)
 STOEnterLong = get_int('setting', 'sto_enter_long', 20)
 STOEnterShort = get_int('setting', 'sto_enter_short', 80)
 
+isConfirmSMAMode = get_str('setting', 'sto_confirm_sma_mode', 'on') == 'on'
+SMA_PERIOD_HIGH = get_int('setting', 'sma_period_high', 50)
+SMA_PERIOD_LOW = get_int('setting', 'sma_period_low', 50)
+
 #------------------------------------------------------------
 # hedge
 #------------------------------------------------------------

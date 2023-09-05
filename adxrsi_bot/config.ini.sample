@@ -73,7 +73,7 @@ trailing_stop_mode = on
 ;# default period
 adx_period = 14
 rsi_period = 14
-sto_k_period = 14
+sto_k_period = 15
 sto_smooth_k = 3
 sto_d_period = 3
 
@@ -92,6 +92,10 @@ sto_d_period = 3
 sto_mode = off
 sto_enter_long = 20
 sto_enter_short = 80
+
+sto_confirm_sma_mode = on
+sma_period_high = 50
+sma_period_low = 50
 
 [symbols_setting]
 ;csv_name = symbol_config.csv

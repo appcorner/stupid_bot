@@ -28,7 +28,7 @@ import ccxt.async_support as ccxt
 # -----------------------------------------------------------------------------
 
 bot_name = 'EMA'
-bot_vesion = '1.5.3'
+bot_vesion = '1.5.3a'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -1346,7 +1346,9 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         availableBalance = balance_entry[marginType] - marginAmount
                         totalMargin = total_margin[marginType] + marginAmount
                         # calculate risk before open new opsition
-                        risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
+                        risk = 0
+                        if availableBalance + totalMargin > 0:
+                            risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
                         if config.risk_limit > 0 and risk > config.risk_limit:
                             print(f"[{symbol}] Status : NOT TRADE LONG, RiskLimit {risk:,.2f}%")
                         else:
@@ -1485,7 +1487,9 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         availableBalance = balance_entry[marginType] - marginAmount
                         totalMargin = total_margin[marginType] + marginAmount
                         # calculate risk before open new opsition
-                        risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
+                        risk = 0
+                        if availableBalance + totalMargin > 0:
+                            risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
                         if config.risk_limit > 0 and risk > config.risk_limit:
                             print(f"[{symbol}] Status : NOT TRADE LONG, RiskLimit {risk:,.2f}%")
                         else:
@@ -1985,7 +1989,9 @@ async def mm_strategy():
                 initialMargin = float(marginAsset['initialMargin'])
                 maintMargin = float(marginAsset['maintMargin'])
                 maintMarginCal = config.maint_margin_ratio * initialMargin
-                maint_margin_ratio = maintMargin / initialMargin
+                maint_margin_ratio = 0
+                if initialMargin > 0:
+                    maint_margin_ratio = maintMargin / initialMargin
                 totalRisk = 0
                 if (availableBalance + initialMargin) > 0:
                     totalRisk = (maintMargin) / (availableBalance + initialMargin) * 100
@@ -2085,15 +2091,20 @@ async def update_all_positions():
         await gather(*loops)
 
         def f(x):
-            symbol = x['symbol']
-            if is_positionside_dual:
-                positionSide = str(x['positionSide']).lower()
-            else:
-                positionSide = 'both'
-            if symbol in orders_history.keys() \
-                and positionSide in orders_history[symbol]['orders_open'].keys():
-                return ''.join(orders_history[symbol]['orders_open'][positionSide])
-            else:
+            if x is None:
+                return '......'
+            try:
+                symbol = x['symbol']
+                if is_positionside_dual:
+                    positionSide = str(x['positionSide']).lower()
+                else:
+                    positionSide = 'both'
+                if symbol in orders_history.keys() \
+                    and positionSide in orders_history[symbol]['orders_open'].keys():
+                    return ''.join(orders_history[symbol]['orders_open'][positionSide])
+                else:
+                    return '......'
+            except:
                 return '......'
         # logger.debug(all_positions.apply(f, axis=1))
         all_positions['orders'] = all_positions.apply(f, axis=1)
@@ -2169,8 +2180,9 @@ async def update_all_balance(notifyLine=False):
             balalce_total += marginBalance
 
             maintMargin = float(marginAsset['maintMargin'])
-            config.maint_margin_ratio = maintMargin / sumMargin
-            
+            if sumMargin > 0:
+                config.maint_margin_ratio = maintMargin / sumMargin
+
             totalRisk = 0
             if (balance_entry[marginType] + sumMargin) > 0:
                 # totalRisk = (config.maint_margin_ratio * sumMargin) / (balance_entry[marginType] + sumMargin) * 100
@@ -2266,7 +2278,7 @@ async def get_currentmode():
     positionside_dual = False
     try:
         exchange = await getExchange()
-        result = await exchange.fapiPrivate_get_positionside_dual()
+        result = await exchange.fapiPrivateGetPositionSideDual()
         positionside_dual = result['dualSidePosition']
         print('positionside_dual:', positionside_dual)
         logger.info(f'positionside_dual: {positionside_dual}')
