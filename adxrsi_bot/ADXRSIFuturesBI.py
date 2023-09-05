@@ -1423,8 +1423,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                         availableBalance = balance_entry[marginType] - marginAmount
                         totalMargin = total_margin[marginType] + marginAmount
                         # calculate risk before open new opsition
-                        risk = 0
-                        if availableBalance + totalMargin > 0:
+                        risk = 0.0
+                        if (availableBalance + totalMargin) > 0:
                             risk = (config.maint_margin_ratio * totalMargin) / (availableBalance + totalMargin) * 100
                         if config.risk_limit > 0 and risk > config.risk_limit:
                             print(f"[{symbol}] Status : NOT TRADE LONG, RiskLimit {risk:,.2f}%")
@@ -1924,14 +1924,13 @@ async def mm_strategy():
                 availableBalance = float(marginAsset['availableBalance'])
                 initialMargin = float(marginAsset['initialMargin'])
                 maintMargin = float(marginAsset['maintMargin'])
-                maintMarginCal = config.maint_margin_ratio * initialMargin
-                maint_margin_ratio = 0
+                # maintMarginCal = config.maint_margin_ratio * initialMargin
                 if initialMargin > 0:
-                    maint_margin_ratio = maintMargin / initialMargin
-                totalRisk = 0
+                    config.maint_margin_ratio = maintMargin / initialMargin
+                totalRisk = 0.0
                 if (availableBalance + initialMargin) > 0:
                     totalRisk = (maintMargin) / (availableBalance + initialMargin) * 100
-                logger.debug(f'maintMargin ({maint_margin_ratio}) {maintMargin} ({config.maint_margin_ratio}) {maintMarginCal} risk {totalRisk}')
+                logger.debug(f'maintMargin {maintMargin} ({config.maint_margin_ratio}) risk {totalRisk}')
                 if is_send_notify_risk == False and (config.risk_limit > 0) and (totalRisk > config.risk_limit):
                     is_send_notify_risk = True
                     logger.debug(f'MM {marginType} Risk Alert: {totalRisk:,.2f}% (limit {config.risk_limit:,.2f}%)')
@@ -2119,9 +2118,8 @@ async def update_all_balance(notifyLine=False):
             if sumMargin > 0:
                 config.maint_margin_ratio = maintMargin / sumMargin
 
-            totalRisk = 0
+            totalRisk = 0.0
             if (balance_entry[marginType] + sumMargin) > 0:
-                # totalRisk = (config.maint_margin_ratio * sumMargin) / (balance_entry[marginType] + sumMargin) * 100
                 totalRisk = (maintMargin) / (balance_entry[marginType] + sumMargin) * 100
             total_risk[marginType] = totalRisk
             total_margin[marginType] = sumMargin
