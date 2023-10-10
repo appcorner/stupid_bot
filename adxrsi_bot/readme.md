@@ -8,6 +8,13 @@ open futures order by ADX+RSI[+STO] indicator
 - ผู้พัฒนาไม่สามารถรับผิดชอบ ความเสียหายที่เกิดจาก การใช้งาน บัค error หรือ อื่นๆ ได้ ผู้ใช้โปรแกรมต้องยอมรับความเสี่ยงที่เกิดขึ้นเอง โดย ทดลอง ทดสอบ ให้มั่นใจก่อนนำไปใช้ในการลงทุน
 - ผู้พัฒนาไม่อนุญาติให้นำโปรแกรมไปแสวงหาผลประโยชน์จากบุคคลอื่น หากทราบ จะหยุดการพัฒนาและเผยแพร่โปรแกรมโดยทันที
 
+## V1.5.3c
+- ปรับปรุงการทำงาน
+
+## V1.5.3b
+- update ccxt
+- เพิ่ม mode STOCH + Confirm SMA  แยกจาก ADX+RSI
+
 ## V1.5.3
 - ปรับปรุงการคำนวน rink แยกตามเหรียญ ก่อนที่จะ open position
 - ปรับปรุงการตั้งค่า levelrage แบบ auto max
@@ -93,6 +100,7 @@ open futures order by ADX+RSI[+STO] indicator
     remove_plot = on
     ;# กำหนด on/off เพื่อ เปิด/ปิด การรายงานสรุป
     summary_report = on
+    notify_api_error = on
 
     [app_config]
     ;TIME_SHIFT = 5
@@ -199,6 +207,9 @@ open futures order by ADX+RSI[+STO] indicator
     active_tl_long = 10.0
     active_tl_short = 10.0
 
+    adxrsi_enter_mode = off
+    adxrsi_exit_mode = off
+
     ;# default period
     adx_period = 14
     rsi_period = 14
@@ -218,9 +229,17 @@ open futures order by ADX+RSI[+STO] indicator
     exit_value_short = 50
 
     ;# STO on/off
-    sto_mode = off
+    sto_mode = on
+    
+    ;# STO setting
     sto_enter_long = 20
+    sto_exit_long = 85
     sto_enter_short = 80
+    sto_exit_short = 15
+
+    sto_confirm_sma_mode = on
+    sma_period_high = 50
+    sma_period_low = 50
 
     [hedge]
     ;# กำหนด on เพื่อเปิด position แบบ hedge
