@@ -29,7 +29,7 @@ import config
 # -----------------------------------------------------------------------------
 
 bot_name = 'ADX+RSI+STO'
-bot_vesion = '1.5.3b'
+bot_vesion = '1.5.3c'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
