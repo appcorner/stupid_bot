@@ -1,4 +1,5 @@
 import requests
+import os
 
 class LineNotify:
     def __init__(self, notify_token):
@@ -9,11 +10,13 @@ class LineNotify:
         session_post = requests.post(self.url, headers=self.headers , data = {'message':text})
         # print(session_post.text)
 
-    def Send_Image(self, text, image_path):
+    def Send_Image(self, text, image_path, remove_file=False):
         file_img = {'imageFile': open(image_path, 'rb')}
         session = requests.Session()
         session_post = session.post(self.url, headers=self.headers, files=file_img, data= {'message': text})
         # print(session_post.text)
+        if remove_file:
+            os.remove(image_path)
 
     def Send_Sticker(self, text, stickerPackageId, stickerId):
         session_post = requests.post(self.url, headers=self.headers, data= {'message': text,'stickerPackageId': stickerPackageId, 'stickerId': stickerId})

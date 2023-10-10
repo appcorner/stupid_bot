@@ -8,7 +8,6 @@ import time
 import mplfinance as mpf
 import matplotlib.pyplot as plt
 from LineNotify import LineNotify
-import config
 import os
 import pathlib
 import logging
@@ -24,14 +23,13 @@ from uuid import uuid4
 
 import ccxt.async_support as ccxt
 
+import config
+
 # print('CCXT Version:', ccxt.__version__)
 # -----------------------------------------------------------------------------
 
-if config.isSTOOn:
-    bot_name = 'ADX+RSI+STO'
-else:
-    bot_name = 'ADX+RSI'
-bot_vesion = '1.5.3a'
+bot_name = 'ADX+RSI+STO'
+bot_vesion = '1.5.3b'
 
 bot_fullname = f'{bot_name} Futures (Binance) version {bot_vesion}'
 
@@ -175,9 +173,11 @@ def cal_callback_rate(symbol, closePrice, targetPrice):
     else:
         return rate
 
-def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
+def cal_minmax_fibo(symbol, df, pd='', entryPrice=0.0, digits=5):
     iday = df.tail(CANDLE_PLOT)
-
+    
+    entryPrice = iday['close'].iloc[-1] if entryPrice == 0.0 else entryPrice
+    
     # swing low
     periods = 3
     lows_list = list(iday['low'])
@@ -240,7 +240,7 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             for idx, fibo_val in enumerate(fibo_values):
                 fibo_level = price_to_precision(symbol, minimum_price + difference * fibo_val)
                 fibo_levels.append(fibo_level)
-                if tp == 0.0 and closePrice < fibo_level:
+                if tp == 0.0 and entryPrice < fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, minimum_price + difference * fibo_values[tp_fibo])
         else:
@@ -259,11 +259,11 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             for idx, fibo_val in enumerate(fibo_values):
                 fibo_level = price_to_precision(symbol, new_minimum_price + difference * fibo_val)
                 fibo_levels.append(fibo_level)
-                if tp == 0.0 and closePrice < fibo_level:
+                if tp == 0.0 and entryPrice < fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, new_minimum_price + difference * fibo_values[tp_fibo])
 
-        sl_fibo = closePrice - difference * fibo_values[1]
+        sl_fibo = entryPrice - difference * fibo_values[1]
         sl_sw = min(swing_lows[-config.SWING_TEST:])
         sl = min(sl_fibo, sl_sw)
 
@@ -277,7 +277,7 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             for idx, fibo_val in enumerate(fibo_values):
                 fibo_level = price_to_precision(symbol, maximum_price - difference * fibo_val)
                 fibo_levels.append(fibo_level)
-                if tp == 0.0 and closePrice > fibo_level:
+                if tp == 0.0 and entryPrice > fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, maximum_price - difference * fibo_values[tp_fibo])
         else:
@@ -296,18 +296,18 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
             for idx, fibo_val in enumerate(fibo_values):
                 fibo_level = price_to_precision(symbol, new_maximum_price - difference * fibo_val)
                 fibo_levels.append(fibo_level)
-                if tp == 0.0 and closePrice > fibo_level:
+                if tp == 0.0 and entryPrice > fibo_level:
                     tp_fibo = min(idx+config.TP_FIBO, len(fibo_values)-1)
                     tp = price_to_precision(symbol, new_maximum_price - difference * fibo_values[tp_fibo])
 
-        sl_fibo = closePrice + difference * fibo_values[1]
+        sl_fibo = entryPrice + difference * fibo_values[1]
         sl_sw = max(swing_highs[-config.SWING_TEST:])
         sl = max(sl_fibo, sl_sw)
 
     if config.CB_AUTO_MODE == 1:
-        callback_rate = cal_callback_rate(symbol, closePrice, tp)
+        callback_rate = cal_callback_rate(symbol, entryPrice, tp)
     else:
-        callback_rate = cal_callback_rate(symbol, closePrice, sl)
+        callback_rate = cal_callback_rate(symbol, entryPrice, sl)
 
     return {
         'fibo_type': 'retractment' if isFiboRetrace else 'extension',
@@ -317,15 +317,19 @@ def cal_minmax_fibo(symbol, df, pd='', closePrice=0.0):
         'fibo_levels': fibo_levels,
         'swing_highs': swing_highs,
         'swing_lows': swing_lows,
-        'tp': tp,
-        'sl': sl,
+        'tp': round(tp, digits),
+        'sl': round(sl, digits),
+        'price': round(entryPrice, digits),
         'tp_txt': '-',
         'sl_txt': '-',
+        'price_txt': 'Price: @{}'.format(round(entryPrice, digits)),
         'callback_rate': callback_rate
     }
 
 async def line_chart(symbol, df, msg, pd='', fibo_data=None, **kwargs):
     try:
+        plt.rcdefaults()
+
         print(f"{symbol} create line_chart")
         data = df.tail(CANDLE_PLOT)
 
@@ -357,6 +361,10 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None, **kwargs):
             mpf.make_addplot(STOhi,ylim=(0, 100),panel=4,color='red',linestyle='-.',width=0.5),
         ]
 
+        if config.isSTOOn:
+            added_plots.append(mpf.make_addplot(data['SMAhi'],panel=0,color='orange',width=0.75))
+            added_plots.append(mpf.make_addplot(data['SMAlo'],panel=0,color='cyan',width=0.75))
+
         kwargs = dict(
             figscale=1.2,
             figratio=(8, 7),
@@ -370,42 +378,55 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None, **kwargs):
         fibo_title = ''
 
         if showFibo:
-            fibo_colors = ['red','brown','orange','gold','green','blue','gray','purple','purple','purple']
+            # fibo_colors = ['red','brown','orange','gold','green','blue','gray','purple','purple','purple']
             logger.debug(fibo_data)
             # fibo_colors.append('g')
             # fibo_data['fibo_levels'].append(fibo_data['swing_highs'][0])
             # fibo_colors.append('r')
             # fibo_data['fibo_levels'].append(fibo_data['swing_lows'][0])
-            fibo_lines = dict(
-                hlines=fibo_data['fibo_levels'],
-                colors=fibo_colors,
-                alpha=0.5,
-                linestyle='-.',
-                linewidths=1,
-                )
-            tpsl_colors = ['g','r']
-            tpsl_data = [fibo_data['tp'], fibo_data['sl']]
-            tpsl_lines = dict(
-                hlines=tpsl_data,
-                colors=tpsl_colors,
-                alpha=0.5,
-                linestyle='-.',
-                linewidths=1,
-                )
-            minmax_lines = dict(
-                alines=fibo_data['min_max'],
-                colors='black',
-                linestyle='--',
-                linewidths=0.1,
-                )
-            fibo_title = ' fibo-'+fibo_data['fibo_type'][0:2]
-            kwargs['hlines']=tpsl_lines
-            kwargs['alines']=minmax_lines
+            # fibo_lines = dict(
+            #     hlines=fibo_data['fibo_levels'],
+            #     colors=fibo_colors,
+            #     alpha=0.5,
+            #     linestyle='-.',
+            #     linewidths=1,
+            #     )
+            tpsl_colors = []
+            tpsl_data = []
+            if 'tp' in fibo_data.keys() and fibo_data['tp'] > 0:
+                tpsl_colors.append('g')
+                tpsl_data.append(fibo_data['tp'])
+            if 'sl' in fibo_data.keys() and fibo_data['sl'] > 0:
+                tpsl_colors.append('r')
+                tpsl_data.append(fibo_data['sl'])
+            if 'price' in fibo_data.keys():
+                tpsl_colors.append('b')
+                tpsl_data.append(fibo_data['price'])
+            if len(tpsl_data) > 0:
+                tpsl_lines = dict(
+                    hlines=tpsl_data,
+                    colors=tpsl_colors,
+                    alpha=0.5,
+                    linestyle='-.',
+                    linewidths=1,
+                    )
+                kwargs['hlines']=tpsl_lines
+
+            if 'min_max' in fibo_data.keys():
+                minmax_lines = dict(
+                    alines=fibo_data['min_max'],
+                    colors='black',
+                    linestyle='--',
+                    linewidths=0.1,
+                    )
+                kwargs['alines']=minmax_lines
+
+            if 'fibo_type' in fibo_data.keys():
+                fibo_title = ' fibo-'+fibo_data['fibo_type'][0:2]
 
         myrcparams = {'axes.labelsize':10,'xtick.labelsize':8,'ytick.labelsize':8}
         mystyle = mpf.make_mpf_style(base_mpf_style='charles',rc=myrcparams)
 
-        filename = f"./plots/order_{symbol}.png"
         fig, axlist = mpf.plot(
             data,
             volume=True,volume_panel=1,
@@ -423,32 +444,121 @@ async def line_chart(symbol, df, msg, pd='', fibo_data=None, **kwargs):
         title.set_fontsize(14)
 
         if showFibo:
-            difference = fibo_data['difference']
-            fibo_levels = fibo_data['fibo_levels']
-            for idx, fibo_val in enumerate(fibo_data['fibo_values']):
-                ax1.text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
+            if 'difference' in fibo_data.keys():
+                difference = fibo_data['difference']
+            else:
+                difference = 0.0
+            
+            if 'fibo_levels' in fibo_data.keys():
+                fibo_colors = ['red','brown','orange','gold','green','blue','gray','purple','purple','purple']
+                fibo_levels = fibo_data['fibo_levels']
+                for idx, fibo_val in enumerate(fibo_data['fibo_values']):
+                    if idx < len(fibo_levels)-1:
+                        ax1.fill_between([0, CANDLE_PLOT] ,fibo_levels[idx],fibo_levels[idx+1],color=fibo_colors[idx],alpha=0.1)
+                    ax1.text(0,fibo_levels[idx] + difference * 0.02,f'{fibo_val}({fibo_levels[idx]:.2f})',fontsize=8,color=fibo_colors[idx],horizontalalignment='left')
 
-            fibo_tp = fibo_data['tp']
-            fibo_tp_txt = fibo_data['tp_txt']
-            ax1.text(CANDLE_PLOT,fibo_tp - difference * 0.04,fibo_tp_txt,fontsize=8,color='g',horizontalalignment='right')
-            fibo_sl = fibo_data['sl']
-            fibo_sl_txt = fibo_data['sl_txt']
-            ax1.text(CANDLE_PLOT,fibo_sl - difference * 0.04,fibo_sl_txt,fontsize=8,color='r',horizontalalignment='right')
+            none_tpsl_txt = []
+            if 'tp' in fibo_data.keys() and fibo_data['tp'] > 0:
+                fibo_tp = fibo_data['tp']
+                fibo_tp_txt = fibo_data['tp_txt']
+                ax1.text(CANDLE_PLOT/2,fibo_tp - difference * 0.06,fibo_tp_txt,fontsize=8,color='g',horizontalalignment='center')
+            else:
+                none_tpsl_txt.append('No TP')
 
+            if 'sl' in fibo_data.keys() and fibo_data['sl'] > 0:
+                fibo_sl = fibo_data['sl']
+                fibo_sl_txt = fibo_data['sl_txt']
+                ax1.text(CANDLE_PLOT/2,fibo_sl - difference * 0.06,fibo_sl_txt,fontsize=8,color='r',horizontalalignment='center')
+            else:
+                none_tpsl_txt.append('No SL')
+                
+            if 'price' in fibo_data.keys():
+                fibo_price = fibo_data['price']
+                fibo_price_txt = fibo_data['price_txt'] + (' [' + ','.join(none_tpsl_txt) + ']' if len(none_tpsl_txt) > 0 else '')
+                ax1.text(CANDLE_PLOT/2,fibo_price - difference * 0.06,fibo_price_txt,fontsize=8,color='b',horizontalalignment='center')
+
+        filename = f"./plots/order_{symbol}_{pd}.png"
         fig.savefig(filename)
 
         plt.close(fig)
 
-        notify.Send_Image(msg, image_path=filename)
-        # await sleep(2)
-        if config.RemovePlot:
-            os.remove(filename)
+        # await sleep(3)
+        notify.Send_Image(msg, image_path=filename, remove_file=config.RemovePlot)
 
     except Exception as ex:
         print(type(ex).__name__, symbol, str(ex))
         logger.exception(f'line_chart {symbol}')
 
     return
+
+async def line_report(marginType, positions, report_summary, is_profitable=True):
+    try:
+        plt.rcdefaults()
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        plt.autoscale()
+
+        cell_text = []
+        for row in range(len(positions)):
+            cell_text.append(positions.iloc[row])
+
+        the_table = ax.table(cellText=cell_text, colLabels=positions.columns, loc='center')
+        the_table.auto_set_font_size(False)
+        the_table.set_fontsize(16)
+        the_table.scale(2.25, 2)
+        # Get the extent of the table and its surrounding axes
+        fig.canvas.draw()
+        extent = the_table.get_window_extent(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
+
+        for col in ['Symbol', 'Entry Price', 'Amount', 'Margin']:
+            col_idx = positions.columns.get_loc(col)
+            # the_table[0, col_idx].get_text().set_color('white')
+            the_table[0, col_idx].set_facecolor("#ebebeb")
+            # the_table[0, col_idx].set_alpha(0.1)
+
+        for col in ['Side', 'Leverage', 'Unrealized PNL', 'Orders']:
+            col_idx = positions.columns.get_loc(col)
+            # the_table[0, col_idx].get_text().set_color('white')
+            the_table[0, col_idx].set_facecolor("#cfcfcf")
+            # the_table[0, col_idx].set_alpha(0.1)
+
+        col_idx = positions.columns.get_loc('Unrealized PNL')
+        for row in range(len(positions)):
+            cell_color = '#f8e0e0'
+            if float(positions.iloc[row, col_idx]) >= 0:
+                cell_color = '#e6f8e0'
+            for col in range(len(positions.columns)):
+                # the_table[row+1, col].get_text().set_color(cell_color)
+                the_table[row+1, col].set_facecolor(cell_color)
+                # the_table[row+1, col].set_alpha(0.1)
+
+        # Calculate the height of the table
+        table_height = extent.height / fig.dpi
+        # Set the y value for the text based on the height of the table
+        text_y = -table_height - 0.05
+        text_head = table_height
+        ax.set_axis_off()
+        bot_title = f"{bot_fullname} - {config.timeframe} - {marginType}"
+        plt.text(0, text_head+0.04, "My Profit & Loss", fontsize=36, color='#f1b90d', backgroundcolor='black', fontweight='bold', ha='center')
+        if is_profitable:
+            plt.text(0, text_y-0.04, report_summary, fontsize=16, ha='center', fontweight='bold', color='#5858fa')
+        else:
+            plt.text(0, text_y-0.04, report_summary, fontsize=16, ha='center', fontweight='bold', color='#fa5858')
+        plt.text(0, text_y-0.06, bot_title, fontsize=14, ha='center')
+
+        # fig.tight_layout()
+        
+        filename = f"./plots/reports_{marginType}.png"
+        fig.savefig(filename, bbox_inches='tight')
+
+        plt.close(fig)
+
+        # await sleep(3)
+        notify.Send_Image('Table Profit', image_path=filename, remove_file=config.RemovePlot)
+
+    except Exception as ex:
+        print(type(ex).__name__, marginType, str(ex))
+        logger.exception(f'line_report {marginType}')
 
 def line_notify_err(message):
     global is_send_notify_error, last_error_message
@@ -884,8 +994,10 @@ async def cancel_order(exchange, symbol, positionSide:str=None):
 #-------------------------------------------------------------------------------
 async def long_TPSL(exchange, symbol, amount, PriceEntry, pricetp, pricesl, closeRate):
     logger.debug(f'{symbol} long_TPSL PriceEntry:{PriceEntry}')
-    await long_TP(exchange, symbol, amount, pricetp, closeRate)
-    await long_SL(exchange, symbol, amount, pricesl)
+    if pricetp > 0.0:
+        await long_TP(exchange, symbol, amount, pricetp, closeRate)
+    if pricesl > 0.0:
+        await long_SL(exchange, symbol, amount, pricesl)
     return
 async def long_TP(exchange, symbol, amount, pricetp, closeRate, newOrder=True):
     closetp = closeRate/100.0
@@ -1092,11 +1204,13 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
     hasLongPosition = False
     hasShortPosition = False
     positionAmt = 0.0
+    unrealizedProfit = 0.0
     
     positionInfo = all_positions.loc[all_positions['symbol']==symbol]
 
     if not positionInfo.empty and float(positionInfo.iloc[-1]["positionAmt"]) != 0:
         positionAmt = float(positionInfo.iloc[-1]["positionAmt"])
+        unrealizedProfit = float(positionInfo.iloc[-1]["unrealizedProfit"])
 
     hasLongPosition = (positionAmt > 0)
     hasShortPosition = (positionAmt < 0)
@@ -1123,7 +1237,9 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
         exitShort = config.ExitShort
         exitValueShort = config.ExitValueShort
         stoValueLong = config.STOEnterLong
+        stoExitLong = config.STOExitLong
         stoValueShort = config.STOEnterShort
+        stoExitShort = config.STOExitShort
         if symbol in symbols_setting.index:
             signalIdx = int(symbols_setting.loc[symbol]['signal_index'])
             tradeMode = symbols_setting.loc[symbol]['trade_mode']
@@ -1141,7 +1257,9 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             exitShort = symbols_setting.loc[symbol]['exit_short']
             exitValueShort = int(symbols_setting.loc[symbol]['exit_value_short'])
             stoValueLong = int(symbols_setting.loc[symbol]['sto_enter_long'])
+            stoExitLong = int(symbols_setting.loc[symbol]['sto_exit_long'])
             stoValueShort = int(symbols_setting.loc[symbol]['sto_enter_short'])
+            stoExitShort = int(symbols_setting.loc[symbol]['sto_exit_short'])
 
         kwargs = dict(
             ADXIn=adxIn,
@@ -1154,10 +1272,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
         rsi = (df.iloc[signalIdx-1]['RSI'], df.iloc[signalIdx]['RSI'])
         adxLast = df.iloc[signalIdx]['ADX']
         # close = (df.iloc[signalIdx-1]['close'], df.iloc[signalIdx]['close'])
-        stoKprev = df.iloc[signalIdx-1]['STOCHk']
-        stoK = df.iloc[signalIdx]['STOCHk']
-        stoDprev = df.iloc[signalIdx-1]['STOCHd']
-        stoD = df.iloc[signalIdx]['STOCHd']
+        stoK = (df.iloc[signalIdx-1]['STOCHk'], df.iloc[signalIdx]['STOCHk'])
+        stoD = (df.iloc[signalIdx-1]['STOCHd'], df.iloc[signalIdx]['STOCHd'])
+
+        # logger.debug(f'{symbol} -> rsi:{rsi} adx:{adxLast} stoK:{stoK} stoD:{stoD}')
 
         # Long Enter
         isLongEnter = adxLast > adxIn and (
@@ -1176,23 +1294,48 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
 
         # Short Exit
         isShortExit = (exitShort == 'up' and rsi[1] > exitValueShort) or (exitShort == 'down' and rsi[1] < exitValueShort)
+        
+        if not config.isADXRSIEnterMode:
+            isLongEnter = False
+            isShortEnter = False
 
-        co_STO = stoKprev < stoDprev and stoK > stoD
-        cu_STO = stoKprev > stoDprev and stoK < stoD
-        isSTOLongEnter = co_STO and stoD <= stoValueLong
-        isSTOShortEnter = cu_STO and stoD >= stoValueShort
+        if not config.isADXRSIExitMode:
+            isLongExit = False
+            isShortExit = False
+
+        # logger.debug(f'{symbol} -> isLongEnter:{isLongEnter} isShortEnter:{isShortEnter} isLongExit:{isLongExit} isShortExit:{isShortExit}')
+
+        co_STO = stoK[0] < stoD[0] and stoK[1] > stoD[1]
+        cu_STO = stoK[0] > stoD[0] and stoK[1] < stoD[1]
+        isSTOLongEnter = co_STO and stoD[1] <= stoValueLong
+        isSTOShortEnter = cu_STO and stoD[1] >= stoValueShort
+        isSTOLongExit = stoD[1] >= stoExitLong
+        isSTOShortExit = stoD[1] <= stoExitShort
 
         if config.isConfirmSMAMode:
             close = df.iloc[signalIdx]['close']
             open = df.iloc[signalIdx]['open']
             sma_lo = df.iloc[signalIdx]['SMAlo']
             sma_hi = df.iloc[signalIdx]['SMAhi']
-            isSTOLongEnter = co_STO and stoD <= stoValueLong and close < sma_lo and open < sma_lo 
-            isSTOShortEnter = cu_STO and stoD >= stoValueShort and close > sma_hi and open > sma_hi
+            # logger.debug(f'{symbol} -> close:{close} open:{open} sma_lo:{sma_lo} sma_hi:{sma_hi}')  
+            isSTOLongEnter = co_STO and stoD[1] <= stoValueLong and close < sma_lo and open < sma_lo 
+            isSTOShortEnter = cu_STO and stoD[1] >= stoValueShort and close > sma_hi and open > sma_hi
 
-        if config.isSTOOn:
+        # logger.debug(f'{symbol} -> isSTOLongEnter:{isSTOLongEnter} isSTOShortEnter:{isSTOShortEnter}')
+
+        if config.isADXRSIEnterMode and config.isSTOOn:
             isLongEnter = isLongEnter and isSTOLongEnter
             isShortEnter = isShortEnter and isSTOShortEnter
+        elif config.isSTOOn:
+            isLongEnter = isSTOLongEnter
+            isShortEnter = isSTOShortEnter
+
+        if config.isADXRSIExitMode and config.isSTOOn:
+            isLongExit = isLongExit or isSTOShortEnter
+            isShortExit = isShortExit or isSTOLongEnter
+        elif config.isSTOOn:
+            isLongExit = isSTOLongExit
+            isShortExit = isSTOShortExit
 
         if config.isHedgeTrade and (isLongEnter or isShortEnter):
             if is_positionside_dual == True:
@@ -1204,7 +1347,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 print(f"[{symbol}] Hedge Mode Off")
                 logger.info(f'{symbol} -> Hedge Mode Off')
 
-        # print(symbol, isBullish, isBearish, rsi, adxLast, stoK, stoD)
+        # print(symbol, isLongEnter, isShortEnter, rsi, adxLast, stoK, stoD)
+        # logger.debug(f'{symbol} -> isLongExit:{isLongExit} isShortExit:{isShortExit}')
 
         closePrice = df.iloc[-1]["close"]
 
@@ -1217,7 +1361,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 print(f"[{symbol}] สถานะ : Short Exit processing...")
                 # await cancel_order(exchange, symbol, 'short')
                 # line_notify(f'{symbol}\nสถานะ : Short RSI Exit\n{round(rsi[1],1)}')
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short RSI Exit\n{round(rsi[1],1)}', 'SHORT EXIT', **kwargs) )
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short Exit\nราคาปิด : {closePrice}\nกำไร : {unrealizedProfit}', 'SHORT EXIT', **kwargs) )
             except Exception as ex:
                 print(type(ex).__name__, symbol, str(ex))
                 logger.exception(f'go_trade {symbol} short exit')
@@ -1230,7 +1374,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 print(f"[{symbol}] สถานะ : Long Exit processing...")
                 # await cancel_order(exchange, symbol, 'long')
                 # line_notify(f'{symbol}\nสถานะ : Long RSI Exit\n{round(rsi[1],1)}')
-                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long RSI Exit\n{round(rsi[1],1)}', 'LONG EXIT', **kwargs) )
+                # \nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}\nSTOk : {round(stoK[1],1)}\nราคา : {priceEntry}
+                gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long Exit\nราคาปิด : {closePrice}\nกำไร : {unrealizedProfit}', 'LONG EXIT', **kwargs) )
             except Exception as ex:
                 print(type(ex).__name__, symbol, str(ex))
                 logger.exception(f'go_trade {symbol} short exit')
@@ -1249,6 +1394,8 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
             logger.info(f'{symbol} -> RiskLimit {total_risk[marginType]:,.2f}% skipping...')
 
         else:
+
+            # logger.debug(f'{symbol} -> isLongEnter:{isLongEnter} isShortEnter:{isShortEnter}')
 
             notify_msg = []
             notify_msg.append(symbol)
@@ -1296,7 +1443,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             await long_enter(exchange, symbol, amount)
                             print(f"[{symbol}] Status : LONG ENTERING PROCESSING...")
                             # await cancel_order(exchange, symbol)
-                            notify_msg.append(f'สถานะ : Long\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}\nราคา : {priceEntry}')
+                            notify_msg.append(f'สถานะ : Long\nราคา : {priceEntry}')
 
                             logger.debug(f'{symbol} LONG\n{df.tail(3)}')
 
@@ -1327,6 +1474,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                         pricetp = price_to_precision(symbol, priceEntry + (priceEntry * (TPLong / 100.0)))
                                         fibo_data['tp_txt'] = f'TP: {TPLong:.2f}% @{pricetp}'
                                         fibo_data['tp'] = pricetp
+                                    elif TPLong < 0:
+                                        pricetp = 0.0
+                                        fibo_data['tp_txt'] = f'TP: None'
+                                        fibo_data['tp'] = pricetp
                                     else:
                                         pricetp = fibo_data['tp']
                                         fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
@@ -1347,6 +1498,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                 elif SLLong > 0:
                                     pricesl = price_to_precision(symbol, priceEntry - (priceEntry * (SLLong / 100.0)))
                                     fibo_data['sl_txt'] = f'SL: {SLLong:.2f}% @{pricesl}'
+                                    fibo_data['sl'] = pricesl
+                                elif SLLong < 0:
+                                    pricesl = 0.0
+                                    fibo_data['sl_txt'] = f'SL: None'
                                     fibo_data['sl'] = pricesl
                                 else:
                                     pricesl = fibo_data['sl']
@@ -1389,7 +1544,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 elif tradeMode != 'on' :
                     fibo_data['tp_txt'] = 'TP'
                     fibo_data['sl_txt'] = 'SL'
-                    gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}', 'LONG', fibo_data, **kwargs) )
+                    gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Long\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}\nSTOk : {round(stoK[1],1)}', 'LONG', fibo_data, **kwargs) )
 
             notify_msg = []
             notify_msg.append(symbol)
@@ -1437,7 +1592,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                             await short_enter(exchange, symbol, amount)
                             print(f"[{symbol}] Status : SHORT ENTERING PROCESSING...")
                             # await cancel_order(exchange, symbol)
-                            notify_msg.append(f'สถานะ : Short\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}\nราคา : {priceEntry}')
+                            notify_msg.append(f'สถานะ : Short\nราคา : {priceEntry}')
 
                             logger.debug(f'{symbol} SHORT\n{df.tail(3)}')
 
@@ -1468,6 +1623,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                         pricetp = price_to_precision(symbol, priceEntry - (priceEntry * (TPShort / 100.0)))
                                         fibo_data['tp_txt'] = f'TP: {TPShort:.2f}% @{pricetp}'
                                         fibo_data['tp'] = pricetp
+                                    elif TPShort < 0:
+                                        pricetp = 0.0
+                                        fibo_data['tp_txt'] = f'TP: None'
+                                        fibo_data['tp'] = pricetp
                                     else:
                                         pricetp = fibo_data['tp']
                                         fibo_data['tp_txt'] = f'TP: (AUTO) @{pricetp}'
@@ -1488,6 +1647,10 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                                 elif SLShort > 0:
                                     pricesl = price_to_precision(symbol, priceEntry + (priceEntry * (SLShort / 100.0)))
                                     fibo_data['sl_txt'] = f'SL: {SLShort:.2f}% @{pricesl}'
+                                    fibo_data['sl'] = pricesl
+                                elif SLShort < 0:
+                                    pricesl = 0.0
+                                    fibo_data['sl_txt'] = f'SL: None'
                                     fibo_data['sl'] = pricesl
                                 else:
                                     pricesl = fibo_data['sl']
@@ -1530,7 +1693,7 @@ async def go_trade(exchange, symbol, chkLastPrice=True):
                 elif tradeMode != 'on' :
                     fibo_data['tp_txt'] = 'TP'
                     fibo_data['sl_txt'] = 'SL'
-                    gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}', 'SHORT', fibo_data, **kwargs) )
+                    gather( line_chart(symbol, df, f'{symbol}\nสถานะ : Short\nADX : {round(adxLast,1)}\nRSI : {round(rsi[1],1)}\nSTOk : {round(stoK[1],1)}', 'SHORT', fibo_data, **kwargs) )
 
     except Exception as ex:
         print(type(ex).__name__, symbol, str(ex))
@@ -2098,6 +2261,7 @@ async def update_all_balance(notifyLine=False):
         balalce_total = 0.0
 
         for marginType in config.MarginType:
+            report_msg = []
             margin_positions = all_positions[all_positions['quote'] == marginType]
             margin_positions.reset_index(drop=True, inplace=True)
             margin_positions.index = margin_positions.index + 1
@@ -2129,21 +2293,28 @@ async def update_all_balance(notifyLine=False):
                 print(margin_positions[POSITION_COLUMNS_DISPLAY])
             else:
                 print('No Positions')
-            ub_msg.append(f"# {marginBalance:,.4f} {marginType}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.4f}\nProfit: {sumProfit:+,.4f}")
+            # ub_msg.append(f"# {marginBalance:,.4f} {marginType}\nFree: {balance_entry[marginType]:,.4f}\nMargin: {sumMargin:,.4f}\nProfit: {sumProfit:+,.4f}")
+            report_msg.append(f"Balance : {marginBalance:,.4f} {marginType}\nFree : {balance_entry[marginType]:,.4f} Margin : {sumMargin:,.4f}\n\nProfit : {sumProfit:+,.4f}")
             print(f"Balance === {marginBalance:,.4f} {marginType} Free: {balance_entry[marginType]:,.4f} Margin: {sumMargin:,.4f} Profit: {sumProfit:+,.4f}")
             risk_txt = ' (no limit)'
             if config.risk_limit > 0:
                 risk_txt = f' (limit {config.risk_limit:,.2f}%)'
-            ub_msg.append(f"Risk: {totalRisk:,.2f}%{risk_txt}")
+            # ub_msg.append(f"Risk: {totalRisk:,.2f}%{risk_txt}")
+            report_msg.append(f"\nRisk : {totalRisk:,.2f}%{risk_txt}")
             print(f"Risk ====== {totalRisk:,.2f}%{risk_txt}")
             if totalRisk > config.risk_limit:
                 is_send_notify_risk = True
-        
+            if len(margin_positions) > 0 and notifyLine and config.LastNotifyTime < time.time():
+                local_time = time.ctime(time.time())
+                report_msg.append(f'\nBot Last Processing : == {local_time} ==')
+                await line_report(marginType, margin_positions[POSITION_COLUMNS_DISPLAY], '\n'.join(report_msg), sumProfit >= 0)
+            
         balance_change = balalce_total - start_balance_total if start_balance_total > 0 else 0
         ub_msg.append(f"# Total {balalce_total:,.4f}\n# Change {balance_change:+,.4f}")
         print(f"Total ===== {balalce_total:,.4f} Change: {balance_change:+,.4f}")
 
-        if notifyLine:
+        if notifyLine and config.LastNotifyTime < time.time():
+            config.LastNotifyTime += TIMEFRAME_SECONDS['1h']
             line_notify('\n'.join(ub_msg))
             
         logger.info(f'countTrade:{count_trade} (L:{count_trade_long},S:{count_trade_short}) balance_entry:{balance_entry} sumMargin:{sumMargin} sumProfit:{sumProfit} totalRisk:{totalRisk}')
@@ -2248,6 +2419,9 @@ async def main():
     is_positionside_dual = await get_currentmode()
 
     load_orders_history_json(history_json_path)
+
+    t1 = time.time()
+    config.LastNotifyTime = t1 - (t1 % TIMEFRAME_SECONDS['1h'])
 
     # แสดงค่า positions & balance
     await update_all_balance(notifyLine=config.SummaryReport)

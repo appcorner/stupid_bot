@@ -1,3 +1,5 @@
+import sys
+import os
 import configparser
 
 def is_exist(group, name):
@@ -63,6 +65,13 @@ def get_float(group, name, default=0.0):
         print(f'config {group}.{name} not found, set default to {default}')
     return value
 
+config_file = 'config.ini'
+if len(sys.argv) == 2:
+    config_file = sys.argv[1]
+
+if not os.path.isfile(config_file):	
+    print(f'Config file {config_file} not found')
+    sys.exit(1)
 
 config = configparser.ConfigParser(interpolation=None)
 config.optionxform = str
@@ -83,6 +92,7 @@ LINE_NOTIFY_TOKEN = get_str('line','notify_token')
 RemovePlot = (get_str('line','remove_plot', 'off') == 'on')
 SummaryReport = (get_str('line','summary_report', 'off') == 'on')
 is_notify_api_error = (get_str('line','notify_api_error', 'off') == 'on')
+LastNotifyTime = None
 
 #------------------------------------------------------------
 # app_config
@@ -190,13 +200,18 @@ ExitValueShort = get_int('setting', 'exit_value_short', 50)
 # MACD_SIGNAL = get_int('setting', 'macd_signal', 9)
 RSI_PERIOD = get_int('setting', 'rsi_period', 14)
 
+isADXRSIEnterMode = get_str('setting', 'adxrsi_enter_mode', 'on') == 'on'
+isADXRSIExitMode = get_str('setting', 'adxrsi_exit_mode', 'on') == 'on'
 isSTOOn = get_str('setting', 'sto_mode', 'on') == 'on'
+
 STO_K_PERIOD = get_int('setting', 'sto_k_period', 14)
 STO_SMOOTH_K = get_int('setting', 'sto_smooth_k', 3)
 STO_D_PERIOD = get_int('setting', 'sto_d_period', 3)
 
 STOEnterLong = get_int('setting', 'sto_enter_long', 20)
+STOExitLong = get_int('setting', 'sto_exit_long', 80)
 STOEnterShort = get_int('setting', 'sto_enter_short', 80)
+STOExitShort = get_int('setting', 'sto_exit_short', 20)
 
 isConfirmSMAMode = get_str('setting', 'sto_confirm_sma_mode', 'on') == 'on'
 SMA_PERIOD_HIGH = get_int('setting', 'sma_period_high', 50)

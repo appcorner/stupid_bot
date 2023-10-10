@@ -1,0 +1,1 @@
+pyinstaller ADXRSIFuturesBI.py --collect-submodules application --onefile --name ADXRSIFuturesBI
